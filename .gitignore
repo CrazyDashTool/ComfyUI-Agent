@@ -1,0 +1,7 @@
+# В этом репозитории хранится только расширение ComfyUI-Agent.
+# Остальные папки custom_nodes на диске игнорируются.
+/*
+!/.gitignore
+!/LICENSE
+!/README.md
+!/ComfyUI-Agent/
