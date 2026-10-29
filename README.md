@@ -1,66 +1,100 @@
 # ComfyUI-Agent
 
-Аналог встроенного **Comfy Agent** для локального ComfyUI: боковая панель с ИИ-агентом, который видит холст, строит, правит, проверяет и запускает воркфлоу.
+An in-app AI agent for ComfyUI: a sidebar chat that sees your canvas, builds, edits, validates and runs workflows, and looks at the results. A local, bring-your-own-model alternative to the built-in Comfy Agent.
 
-Это расширение интерфейса (не нода на холсте): панель живёт в левой боковой панели ComfyUI (иконка с облачком чата).
+> Beta. It is a UI extension (a sidebar panel), not a node on the canvas.
 
-## Что умеет
+## Features
 
-- **Строит и правит граф** по текстовому описанию: ищет ноды (`find_nodes`), создаёт ноды и связи одним вызовом (`build_graph`), меняет виджеты, mute/bypass, удаляет.
-- **Читает холст** (`get_graph`), выделенные ноды, сохранённые воркфлоу (`read_workflow`), железо и модели (`system_info`, `list_models`).
-- **Отлаживает**: `validate_graph` ищет неподключённые входы, несуществующие модели и неустановленные ноды; ошибки запуска агент читает и исправляет.
-- **Запускает генерации** (`run_workflow`) и смотрит на результат (картинки уходят модели, если включён vision).
-- **Права на запуск** как в оригинале: `Спросить` (подтверждение перед каждым запуском и перед разрушительными действиями) или `Авто`.
-- **@-ссылки**: `@` → **Ноды** / **Воркфлоу** / **Генерации**.
-  - *Генерации* — картинки из истории запусков. Агент получает саму картинку и граф, который её создал (seed, модель, промпты). Может восстановить воркфлоу генерации на холсте (`load_generation_workflow`).
-- **Картинки в чат**: кнопка `+`, Ctrl+V или перетаскивание файла.
-- **Скиллы**: сохранённые инструкции (`skills/*.md`), агент читает подходящие сам. Создаются/удаляются просьбой в чате.
-- **Несколько чатов** параллельно (до 5) с историей, развернуть панель в окно кнопкой в шапке.
-- **Кастомные ноды**: агент видит все загруженные ноды и их паки (`list_custom_nodes`), читает README пака (`get_custom_node_docs`) и понимает, для чего пак нужен; краткий список паков передаётся ему в каждый запрос.
-- **Идеи и быстрые ответы**: на пустом чате модель сама предлагает, что сделать сегодня (по установленным нодам и холсту), а после ответа показывает кнопки с вариантами реплики. Отключается в ⚙. Это один дополнительный короткий запрос к LLM.
-- **Копирование картинок**: у результатов генерации в чате есть кнопка копирования в буфер обмена (нужен localhost или https).
-- **Язык**: по умолчанию English; в ⚙ можно выбрать Русский, Deutsch, Polski или Français. Агент отвечает на выбранном языке.
-- **Мысли и шаги**: блок «Thoughts» показывает рассуждения модели (поле `reasoning_content`/`reasoning` или теги `<think>`), а «Worked» раскрывается до входа и результата каждого инструмента.
-- **Название чата** генерирует модель после первого ответа.
-- **Для слабых моделей**: агент каждый шаг получает живой снимок холста (пустой он или нет), список моделей на диске, рецепты в промпте; инструменты `generate`, `set_prompt`, `set_param`, `create_workflow` (шаблоны z_image_turbo, qwen_image, flux_dev, sd_checkpoint с автоподбором установленных моделей); неточные имена инструментов исправляются, tool-call в виде текста (`<tool_call>`, JSON) распознаётся, а ответы «сейчас сделаю» и вопросы вместо действий подталкиваются к вызову инструмента.
-- **Время**: после «Thoughts» и «Worked» показывается, сколько модель думала и сколько шли инструменты (и по каждому шагу отдельно).
-- **Правка своего сообщения с откатом**: карандаш у сообщения меняет текст и отправляет заново, стрелка назад откатывает чат и возвращает холст к состоянию перед сообщением (снимок холста хранится в памяти вкладки, после перезагрузки страницы откатывается только чат).
-- **Готовые воркфлоу ComfyUI**: `list_templates` / `read_template` / `load_template` (официальные шаблоны и примеры кастомных нод), `list_open_workflows`, `read_workflow`: агент копирует настоящие графы вместо догадок.
-- **Веб-поиск (опционально)**: в ⚙ выбери Ollama web search, Tavily, Brave, Serper или свой SearXNG; появятся инструменты `web_search` и `read_url` (приватные адреса заблокированы).
-- **Генерации в чате**: результаты показываются в чате, у каждой картинки есть кнопки «копировать» и «@» (сослаться в следующем сообщении); агент может сам показать старые картинки (`show_images`), найти их (`list_generations`), посмотреть (`inspect_generation`) и вставить в текст как `![подпись](comfy:файл.png)`.
-- Любая LLM: OpenAI-совместимые API (OpenAI, Google AI Studio (Gemini), OpenRouter, DeepSeek, Groq, Ollama, LM Studio, свой сервер) и Anthropic.
+- **Builds and edits graphs** from a text request: searches installed nodes, creates nodes and links, changes widgets, mutes or bypasses nodes.
+- **Sees the live canvas** (empty or not, every node and link) and the model files on disk.
+- **Ready templates** for Z-Image Turbo, Qwen-Image, FLUX.1 and SD/SDXL checkpoints, with installed models picked automatically.
+- **One-call actions** for small models: `generate`, `set_prompt`, `set_param`, `create_workflow`.
+- **Validates before running**: missing inputs, unavailable model files, uninstalled nodes, no output node.
+- **Runs generations and looks at the result** (images are sent to the model when vision is on). Failed runs are read and fixed.
+- **Run permissions**: `Ask` (approval before each run and before destructive actions) or `Auto`.
+- **@ references**: Nodes, Workflows and **Generations** (past images together with the graph that produced them).
+- **Custom nodes**: sees every loaded pack, reads their README, explains what they are for.
+- **Official templates and your workflows**: browse ComfyUI templates, saved and open workflows instead of guessing.
+- **Edit and roll back**: edit any of your messages and resend; chat context and the canvas return to the state before it.
+- **Thinking and timing**: expandable model thoughts and per-step input/result with durations.
+- **Generated images in chat**: copy, reference with `@`, or let the agent show and embed them.
+- **Ideas and quick replies** generated by the model, plus automatic chat titles (can be turned off).
+- **Skills**: saved instruction packs the agent can read, create and delete.
+- **Optional web search**: Ollama web search, Tavily, Brave, Serper or self-hosted SearXNG.
+- Up to 5 parallel chats, expandable window, image attach by button, paste or drag and drop.
+- UI languages: English, Русский, Deutsch, Polski, Français.
 
-## Установка
+## Requirements
 
-```
+- ComfyUI with a recent frontend (the sidebar tab API is required).
+- An LLM with **tool calling**. Vision-capable models are recommended so the agent can see images.
+
+## Installation
+
+```bash
 cd ComfyUI/custom_nodes
-git clone <этот репозиторий> ComfyUI-Agent      # или распакуй папку сюда
+git clone https://github.com/CrazyDashTool/ComfyUI-Agent
 ```
 
-Перезапусти ComfyUI, открой панель агента, нажми ⚙ и укажи провайдера, ключ и модель (кнопка «Загрузить список» подтянет модели с сервера). Дополнительные зависимости не нужны (используется `aiohttp`, он уже есть в ComfyUI).
+Restart ComfyUI and open the **Agent** tab in the left sidebar (chat icon).
+No extra dependencies are needed: the backend uses `aiohttp`, which ships with ComfyUI.
 
-Для агента нужна модель с **tool calling**. Для локальных (Ollama / LM Studio) берите модели с поддержкой инструментов; для `vision` — мультимодальные.
+To update:
 
-## Где хранится
+```bash
+cd ComfyUI/custom_nodes/ComfyUI-Agent
+git pull
+```
 
-- Ключ и настройки: `config.json` рядом с расширением (на диске, наружу в браузер ключ не отдаётся; файл в `.gitignore`).
-- Чаты: `localStorage` браузера (картинки в историю не сохраняются).
-- Скиллы: `skills/*.md`.
+## Setup
 
-## Устройство
+1. Open the Agent panel and click the gear icon.
+2. Pick a preset (OpenAI, Google AI Studio, Anthropic, OpenRouter, DeepSeek, Groq, Ollama, LM Studio or custom).
+3. Enter the API key (not needed for local servers) and click **Load list** to fetch models, or type a model name.
+4. Click **Save**.
 
-| Файл | Роль |
+Any OpenAI-compatible endpoint works. Anthropic is supported through its own API.
+
+### Web search (optional)
+
+In settings choose a search provider and enter its key (SearXNG needs only its URL). This adds the `web_search` and `read_url` tools. Private and local addresses are blocked for `read_url`, and results are treated as untrusted data.
+
+## Usage
+
+- Type a request, for example: `Build a Z-Image Turbo workflow` or `Change the prompt to a cat in a spacesuit and generate`.
+- Type `@` to reference nodes, saved workflows or past generations.
+- Hover over one of your messages to edit it or roll the chat and canvas back to that point.
+- Switch `Ask` / `Auto` next to the send button to control run approvals.
+
+## Where data is stored
+
+- `config.json` next to the extension: provider settings and API keys. It stays on disk, is never sent to the browser, and is listed in `.gitignore`.
+- Browser `localStorage`: chats (images are not saved) and UI language.
+- `skills/*.md`: saved skills.
+
+## Project structure
+
+| File | Purpose |
 |---|---|
-| `__init__.py` | подключает бэкенд и `web/` |
-| `agent_server.py` | прокси к LLM (`/crazy_agent/chat`), конфиг, список моделей, скиллы |
-| `web/agent.js` | панель, цикл агента, инструменты холста, @-ссылки, права на запуск |
-| `web/agent.css` | стили на переменных темы ComfyUI |
+| `__init__.py` | Registers the backend and the `web/` directory |
+| `agent_server.py` | LLM proxy (OpenAI-compatible and Anthropic), config, skills, web search |
+| `web/agent.js` | Panel UI, agent loop, canvas tools, references, permissions |
+| `web/agent.css` | Styles and animations based on ComfyUI theme variables |
 
-Инструменты выполняются в браузере (там живёт граф), а LLM вызывается через бэкенд, поэтому нет проблем с CORS и ключ не светится.
+Tools run in the browser (that is where the graph lives); the LLM is called through the backend, so there are no CORS problems and keys are never exposed.
 
-## Ограничения
+## Limitations
 
-- Ответ приходит целиком, без потокового вывода.
-- Подграфы (subgraphs) агент видит как обычные ноды.
-- Запуск идёт через `api.queuePrompt`; режим `control_after_generate` отрабатывает, но batch count из панели ComfyUI не учитывается.
-- Тестировалось на логике ComfyUI Frontend 1.2x+ (нужен `registerSidebarTab`).
+- Responses arrive as a whole, without token streaming.
+- Subgraphs are seen as regular nodes.
+- Canvas snapshots for rollback are kept in memory only: after a page reload only the chat is rolled back.
+- Answer quality depends on the model; small local models work best with the one-call tools above.
+
+## License
+
+Apache-2.0, see [LICENSE](LICENSE).
+
+## Created by CrazyDashTool
+
+[GitHub](https://github.com/CrazyDashTool) · [YouTube](https://www.youtube.com/@CrazyDashToolOficial)
