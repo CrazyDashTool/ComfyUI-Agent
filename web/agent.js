@@ -67,6 +67,21 @@ const EN = {
   stRuns: "Runs", stSteps: "Steps {n}", stTools: "Tools {n}", stTokens: "{n} tokens", stTokensNA: "tokens n/a",
   stStepsTools: "{steps} steps · {tools} tools", stPrompt: "Input tokens", stCompletion: "Output tokens",
   stTotal: "Total tokens", stCost: "Est. cost", stCostNA: "cost n/a", stErrors: "Tool errors", stReset: "Reset stats",
+  modeTitle: "Agent mode", modeSub: "Fast acts at once, Plan plans first",
+  modeFast: "Fast mode", modeFastSub: "Act right away: build, edit and run as usual",
+  modePlanSub: "Plan first: roadmap, step checks, questions and context compression",
+  modePlanShort: "Plan", modeFastShort: "Fast",
+  updateTitle: "Update ComfyUI-Agent", updateSub: "Compare this folder with GitHub",
+  updateCheckOpt: "Check GitHub on start (notifies with sound)",
+  autoUpdateOpt: "Update automatically",
+  checkUpdates: "Check now", updateManual: "Update manually", updateNow: "Update now", updateLater: "Later",
+  updateChecking: "Checking for updates…", updateNone: "You are up to date.",
+  updateAvailable: "Update available: {tag}",
+  updateApplied: "Updated to {tag}.",
+  updateDirty: "Update skipped: the folder has local changes.",
+  updateNoGit: "Updates work only in a git checkout.", updateFailed: "Update failed: {err}",
+  updateRestart: "Restart ComfyUI and reload the page.",
+  ctxCompressed: "Earlier steps were compressed; goals, decisions and the roadmap are kept.",
   planMode: "Plan mode", planTitle: "Plan", planApprove: "Approve", planCancel: "Cancel", planRevise: "Request changes",
   planFeedback: "Optional: what to change", planStateApproved: "Approved", planStateRevised: "Changes requested", planStateCancelled: "Cancelled",
   roadmapTitle: "Roadmap", roadmapActive: "In progress", roadmapDone: "Completed", roadmapFailed: "Needs attention",
@@ -134,6 +149,21 @@ const RU_STR = {
   stRuns: "Запуски", stSteps: "Шагов: {n}", stTools: "Инструментов: {n}", stTokens: "токенов: {n}", stTokensNA: "токены н/д",
   stStepsTools: "шагов: {steps} · инструментов: {tools}", stPrompt: "Входные токены", stCompletion: "Выходные токены",
   stTotal: "Всего токенов", stCost: "Оценка стоимости", stCostNA: "стоимость н/д", stErrors: "Ошибки инструментов", stReset: "Сбросить статистику",
+  modeTitle: "Режим агента", modeSub: "Fast действует сразу, Plan сначала планирует",
+  modeFast: "Fast mode", modeFastSub: "Сразу к делу: строит, правит и запускает как обычно",
+  modePlanSub: "Сначала план: роадмап, проверка шагов, вопросы и сжатие контекста",
+  modePlanShort: "План", modeFastShort: "Фаст",
+  updateTitle: "Обновление ComfyUI-Agent", updateSub: "Сверяет папку с GitHub",
+  updateCheckOpt: "Проверять GitHub при запуске (уведомление со звуком)",
+  autoUpdateOpt: "Обновлять автоматически",
+  checkUpdates: "Проверить", updateManual: "Обновить вручную", updateNow: "Обновить", updateLater: "Позже",
+  updateChecking: "Проверяю обновления…", updateNone: "Обновлений нет.",
+  updateAvailable: "Доступно обновление: {tag}",
+  updateApplied: "Обновлено до {tag}.",
+  updateDirty: "Обновление пропущено: в папке есть локальные изменения.",
+  updateNoGit: "Автообновление работает только для git-копии.", updateFailed: "Не удалось обновить: {err}",
+  updateRestart: "Перезапусти ComfyUI и обнови страницу.",
+  ctxCompressed: "Ранние шаги сжаты; цели, решения и роадмап сохранены.",
   planMode: "Режим планирования", planTitle: "План", planApprove: "Подтвердить", planCancel: "Отмена", planRevise: "Запросить изменения",
   planFeedback: "Необязательно: что поменять", planStateApproved: "Подтверждён", planStateRevised: "Запрошены изменения", planStateCancelled: "Отменён",
   roadmapTitle: "Маршрут", roadmapActive: "В процессе", roadmapDone: "Завершён", roadmapFailed: "Требует внимания",
@@ -201,6 +231,21 @@ const DE_STR = {
   stRuns: "Läufe", stSteps: "Schritte {n}", stTools: "Tools {n}", stTokens: "{n} Tokens", stTokensNA: "Tokens n/v",
   stStepsTools: "{steps} Schritte · {tools} Tools", stPrompt: "Eingabe-Tokens", stCompletion: "Ausgabe-Tokens",
   stTotal: "Tokens gesamt", stCost: "Gesch. Kosten", stCostNA: "Kosten n/v", stErrors: "Tool-Fehler", stReset: "Statistik zurücksetzen",
+  modeTitle: "Agent-Modus", modeSub: "Fast handelt sofort, Plan plant zuerst",
+  modeFast: "Fast-Modus", modeFastSub: "Sofort handeln: bauen, bearbeiten und ausführen wie gewohnt",
+  modePlanSub: "Erst planen: Roadmap, Schrittprüfung, Rückfragen und Kontextkompression",
+  modePlanShort: "Plan", modeFastShort: "Fast",
+  updateTitle: "ComfyUI-Agent aktualisieren", updateSub: "Vergleicht diesen Ordner mit GitHub",
+  updateCheckOpt: "Beim Start GitHub prüfen (Hinweis mit Ton)",
+  autoUpdateOpt: "Automatisch aktualisieren",
+  checkUpdates: "Jetzt prüfen", updateManual: "Manuell aktualisieren", updateNow: "Jetzt aktualisieren", updateLater: "Später",
+  updateChecking: "Suche nach Updates…", updateNone: "Alles aktuell.",
+  updateAvailable: "Update verfügbar: {tag}",
+  updateApplied: "Aktualisiert auf {tag}.",
+  updateDirty: "Update übersprungen: lokale Änderungen im Ordner.",
+  updateNoGit: "Updates nur für eine Git-Kopie.", updateFailed: "Update fehlgeschlagen: {err}",
+  updateRestart: "ComfyUI neu starten und die Seite neu laden.",
+  ctxCompressed: "Frühere Schritte wurden komprimiert; Ziele, Entscheidungen und Roadmap bleiben erhalten.",
   planMode: "Planungsmodus", planTitle: "Plan", planApprove: "Bestätigen", planCancel: "Abbrechen", planRevise: "Änderungen anfordern",
   planFeedback: "Optional: was ändern", planStateApproved: "Bestätigt", planStateRevised: "Änderungen angefordert", planStateCancelled: "Abgebrochen",
   roadmapTitle: "Roadmap", roadmapActive: "In Arbeit", roadmapDone: "Abgeschlossen", roadmapFailed: "Braucht Aufmerksamkeit",
@@ -268,6 +313,21 @@ const PL_STR = {
   stRuns: "Uruchomienia", stSteps: "Kroki {n}", stTools: "Narzędzia {n}", stTokens: "{n} tokenów", stTokensNA: "tokeny b.d.",
   stStepsTools: "{steps} kroków · {tools} narzędzi", stPrompt: "Tokeny wejściowe", stCompletion: "Tokeny wyjściowe",
   stTotal: "Tokeny razem", stCost: "Szac. koszt", stCostNA: "koszt b.d.", stErrors: "Błędy narzędzi", stReset: "Zeruj statystyki",
+  modeTitle: "Tryb agenta", modeSub: "Fast działa od razu, Plan najpierw planuje",
+  modeFast: "Tryb Fast", modeFastSub: "Działaj od razu: buduj, edytuj i uruchamiaj jak zwykle",
+  modePlanSub: "Najpierw plan: roadmapa, kontrola kroków, pytania i kompresja kontekstu",
+  modePlanShort: "Plan", modeFastShort: "Fast",
+  updateTitle: "Aktualizacja ComfyUI-Agent", updateSub: "Porównuje ten folder z GitHubem",
+  updateCheckOpt: "Sprawdzaj GitHub przy starcie (powiadomienie z dźwiękiem)",
+  autoUpdateOpt: "Aktualizuj automatycznie",
+  checkUpdates: "Sprawdź teraz", updateManual: "Aktualizuj ręcznie", updateNow: "Aktualizuj", updateLater: "Później",
+  updateChecking: "Sprawdzam aktualizacje…", updateNone: "Wszystko aktualne.",
+  updateAvailable: "Dostępna aktualizacja: {tag}",
+  updateApplied: "Zaktualizowano do {tag}.",
+  updateDirty: "Pominięto aktualizację: folder ma lokalne zmiany.",
+  updateNoGit: "Aktualizacja tylko dla kopii git.", updateFailed: "Aktualizacja nie powiodła się: {err}",
+  updateRestart: "Uruchom ponownie ComfyUI i odśwież stronę.",
+  ctxCompressed: "Wcześniejsze kroki zostały skompresowane; cele, decyzje i roadmapa pozostają.",
   planMode: "Tryb planowania", planTitle: "Plan", planApprove: "Zatwierdź", planCancel: "Anuluj", planRevise: "Poproś o zmiany",
   planFeedback: "Opcjonalnie: co zmienić", planStateApproved: "Zatwierdzony", planStateRevised: "Poproszono o zmiany", planStateCancelled: "Anulowany",
   roadmapTitle: "Plan działania", roadmapActive: "W trakcie", roadmapDone: "Ukończony", roadmapFailed: "Wymaga uwagi",
@@ -335,6 +395,21 @@ const FR_STR = {
   stRuns: "Exécutions", stSteps: "Étapes {n}", stTools: "Outils {n}", stTokens: "{n} jetons", stTokensNA: "jetons n/d",
   stStepsTools: "{steps} étapes · {tools} outils", stPrompt: "Jetons d'entrée", stCompletion: "Jetons de sortie",
   stTotal: "Jetons au total", stCost: "Coût est.", stCostNA: "coût n/d", stErrors: "Erreurs d'outil", stReset: "Réinitialiser",
+  modeTitle: "Mode de l'agent", modeSub: "Fast agit tout de suite, Plan planifie d'abord",
+  modeFast: "Mode Fast", modeFastSub: "Agir tout de suite : construire, modifier et exécuter comme d'habitude",
+  modePlanSub: "Planifier d'abord : feuille de route, vérification des étapes, questions et compression du contexte",
+  modePlanShort: "Plan", modeFastShort: "Fast",
+  updateTitle: "Mettre à jour ComfyUI-Agent", updateSub: "Compare ce dossier avec GitHub",
+  updateCheckOpt: "Vérifier GitHub au démarrage (notification sonore)",
+  autoUpdateOpt: "Mettre à jour automatiquement",
+  checkUpdates: "Vérifier", updateManual: "Mettre à jour manuellement", updateNow: "Mettre à jour", updateLater: "Plus tard",
+  updateChecking: "Recherche de mises à jour…", updateNone: "Tout est à jour.",
+  updateAvailable: "Mise à jour disponible : {tag}",
+  updateApplied: "Mis à jour vers {tag}.",
+  updateDirty: "Mise à jour ignorée : le dossier a des changements locaux.",
+  updateNoGit: "Mise à jour réservée à une copie git.", updateFailed: "Échec de la mise à jour : {err}",
+  updateRestart: "Redémarre ComfyUI et recharge la page.",
+  ctxCompressed: "Les étapes précédentes ont été compressées ; objectifs, décisions et feuille de route sont conservés.",
   planMode: "Mode plan", planTitle: "Plan", planApprove: "Approuver", planCancel: "Annuler", planRevise: "Demander des modifications",
   planFeedback: "Facultatif : quoi modifier", planStateApproved: "Approuvé", planStateRevised: "Modifications demandées", planStateCancelled: "Annulé",
   roadmapTitle: "Feuille de route", roadmapActive: "En cours", roadmapDone: "Terminé", roadmapFailed: "À vérifier",
@@ -390,15 +465,16 @@ const PRESETS = [
 
 const S = {
   chats: [], activeId: null, perm: "ask", expanded: false, view: "chat",
-  refs: [], atts: [], refMenu: null, permOpen: false, histOpen: false,
+  refs: [], atts: [], refMenu: null, modeOpen: false, histOpen: false,
   cfg: null, objInfo: null, objInfoAt: 0, hostEl: null, skills: [],
-  streamBroken: false, stats: null,
+  streamBroken: false, stats: null, updateBusy: false,
 };
 const ui = {};
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 const activeChat = () => S.chats.find((c) => c.id === S.activeId) || S.chats[0];
 const visionOn = () => S.cfg?.vision !== false;
+const planOn = () => S.cfg?.plan_mode === true;
 
 function clip(s, n) {
   s = String(s ?? "");
@@ -624,8 +700,6 @@ function loadState() {
   if (!S.chats.length) newChat();
   if (!S.chats.find((c) => c.id === S.activeId)) S.activeId = S.chats[0].id;
 }
-
-// --- Chat export (Markdown / JSON, with errors, rollbacks and approvals) ---
 
 function downloadBlob(name, text, mime) {
   try {
@@ -1196,6 +1270,59 @@ function outputSpecs(d) {
   return (d.output || []).map((ty, i) => ({ name: d.output_name?.[i] || String(ty), type: Array.isArray(ty) ? "COMBO" : String(ty) }));
 }
 
+const MEDIA_FILE = /\.(?:png|jpe?g|webp|gif|bmp|tiff?|avif|heic|mp4|webm|mov|mkv|avi|wav|mp3|flac|ogg|opus|m4a|aac)$/i;
+
+async function mediaFileExists(value) {
+  const raw = String(value || "").replace(/\s*\[(?:input|output|temp)\]\s*$/i, "").trim();
+  if (!MEDIA_FILE.test(raw) || /^(?:https?:|data:|blob:)/i.test(raw)) return true;
+  const cut = raw.lastIndexOf("/");
+  const name = cut >= 0 ? raw.slice(cut + 1) : raw;
+  const sub = cut >= 0 ? raw.slice(0, cut) : "";
+  try {
+    const r = await api.fetchApi(`/view?filename=${encodeURIComponent(name)}&subfolder=${encodeURIComponent(sub)}&type=input`, { cache: "no-store" });
+    try { r.body?.cancel?.(); } catch {}
+    return r.ok;
+  } catch { return true; }
+}
+
+function graphProblems(info) {
+  const problems = [];
+  let hasOut = false;
+  for (const n of nodesOf()) {
+    if (n.mode === 2 || n.mode === 4) continue;
+    const d = info[n.type];
+    if (!d) { problems.push(`#${n.id} ${n.type}: node type is not installed (missing custom node?)`); continue; }
+    if (d.output_node) hasOut = true;
+    for (const e of inputSpecs(d, 100000)) {
+      if (!e.required) continue;
+      const slot = (n.inputs || []).find((i) => i.name === e.name);
+      const linked = slot && slot.link != null;
+      if (e.type === "COMBO") {
+        const w = (n.widgets || []).find((x) => x.name === e.name);
+        if (!linked && w && e.options?.length && !e.options.includes(w.value)) problems.push(`#${n.id} ${n.type}: "${e.name}" = ${JSON.stringify(clipVal(w.value, 80))} is not available (${e.options.length} options). Choose an existing value; the current one will fail.`);
+      } else if (!WIDGET_TYPES.has(e.type) && !linked) problems.push(`#${n.id} ${n.type}: required input "${e.name}" (${e.type}) is not connected`);
+    }
+  }
+  if (!hasOut) problems.push("No active output node (SaveImage / PreviewImage / ...) in the graph");
+  return problems;
+}
+
+async function canvasProblems() {
+  let problems = graphProblems(await getObjInfo());
+  if (problems.some((p) => p.includes(" is not available"))) problems = graphProblems(await getObjInfo(true));
+  const media = new Map();
+  for (const n of nodesOf()) {
+    if (n.mode === 2 || n.mode === 4) continue;
+    for (const w of n.widgets || []) {
+      if (w.type !== "combo" || typeof w.value !== "string" || !MEDIA_FILE.test(w.value)) continue;
+      const val = w.value;
+      if (!media.has(val)) media.set(val, mediaFileExists(val));
+      if (!(await media.get(val))) problems.push(`#${n.id} ${n.type}: "${w.name}" = ${JSON.stringify(clipVal(val, 80))} does not exist in the input folder. This node will fail with "Media input missing"; upload the file or choose an existing name.`);
+    }
+  }
+  return problems;
+}
+
 function searchNodes(q, limit = 15) {
   const toks = q.toLowerCase().split(/[\s,]+/).filter(Boolean);
   const res = [];
@@ -1301,7 +1428,6 @@ const ERR_RULES = [
   { re: /prompt.*(empty|none)|queue failed|nothing to execute/i, cause: "There was nothing valid to run", fix: "Build or validate the workflow first, then run again." },
 ];
 
-// Turns a recorded failure into a short list of likely causes with concrete fixes.
 function analyzeError(rec) {
   const hay = [rec?.exception_type, rec?.exception_message, rec?.text].filter(Boolean).join(" ");
   const hits = ERR_RULES.filter((r) => r.re.test(hay)).map((r) => ({ cause: r.cause, fix: r.fix }));
@@ -1913,8 +2039,6 @@ function coerceValue(spec, val) {
   return val;
 }
 
-// Repairs tool arguments against the declared JSON schema: coerces scalar types,
-// picks the closest enum value and reports missing required fields.
 function validateArgs(schema, raw) {
   const src = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
   const props = schema?.properties || {};
@@ -1946,9 +2070,6 @@ const fmtMs = (ms) => {
   return `${Math.floor(s / 60)}m ${String(Math.round(s % 60)).padStart(2, "0")}s`;
 };
 
-// --- Performance tracking (tokens, estimated cost, time, steps, success) ---
-
-// Approximate USD per 1M tokens [input, output]. Local/free models cost nothing.
 const PRICE_TABLE = [
   ["gpt-4o-mini", 0.15, 0.6], ["gpt-4o", 2.5, 10], ["gpt-4.1-mini", 0.4, 1.6], ["gpt-4.1-nano", 0.1, 0.4], ["gpt-4.1", 2, 8],
   ["gpt-4-turbo", 10, 30], ["o4-mini", 1.1, 4.4], ["o3-mini", 1.1, 4.4], ["o3", 2, 8],
@@ -2101,8 +2222,6 @@ function graphDiff(before, after) {
 
 const diffEmpty = (d) => !d.added && !d.removed && !d.changed && !d.linksAdded && !d.linksRemoved;
 
-// --- Workflow comparison (itemized diff + selective apply) ---
-
 async function resolveGraphSource(src) {
   const s = String(src ?? "").trim();
   if (!s || s === "canvas" || s === "current") {
@@ -2163,8 +2282,6 @@ function workflowDiff(before, after) {
 
 const linkEnds = (l) => (Array.isArray(l) ? [l[1], l[3]] : [l.origin_id, l.target_id]);
 
-// Merges only the selected diff items from `after` onto `before`, then keeps the
-// links that survive plus the ones that touch a node the selection changed.
 function mergeGraphChanges(before, after, items) {
   const data = JSON.parse(JSON.stringify(before || { nodes: [], links: [] }));
   const afterById = new Map((after?.nodes || []).map((n) => [String(n.id), n]));
@@ -2254,8 +2371,6 @@ function clearHighlight() {
   try { app.graph?.setDirtyCanvas(true, true); } catch {}
 }
 
-// Temporarily tints the nodes the agent just created or edited so the user can
-// see what changed. Removed nodes no longer exist, so they are only reported.
 function highlightChanges(diff, opts = {}) {
   const marks = [
     ...(diff?.addedIds || []).map((id) => [id, "added"]),
@@ -2302,8 +2417,6 @@ async function applyDiffSelection(v, chat) {
   if (chat.id === S.activeId) renderMsgs();
   saveSoon();
 }
-
-// --- Subgraphs (nested graphs) ---
 
 const rootGraphOf = () => { try { return app.rootGraph ?? app.graph; } catch { return app.graph; } };
 const activeGraphOf = () => { try { return app.canvas?.graph ?? app.graph; } catch { return app.graph; } };
@@ -2497,7 +2610,7 @@ const TOOLS = {
       }
       const changed = [], errors = [];
       for (const [n, w] of hits) {
-        try { setWidget(n, w.name, a.value); changed.push(`#${n.id} ${n.type}.${w.name}`); } catch (e) { errors.push(e.message); }
+        try { setWidget(n, w.name, a.value); changed.push({ node: n.id, type: n.type, widget: w.name, value: clipVal(w.value, 120) }); } catch (e) { errors.push(e.message); }
       }
       commit();
       return JSON.stringify({ changed, errors });
@@ -2635,28 +2748,10 @@ const TOOLS = {
     run: async () => { app.graph.clear(); commit(); return "cleared"; },
   },
   validate_graph: {
-    desc: "Check the canvas before running: unknown node types, required inputs without links, model/combo values that are not available, missing output nodes.",
+    desc: "Check the canvas before running: unknown node types, required inputs without links, model/combo values that are not available, missing media files on disk, missing output nodes.",
     params: obj({}),
     run: async () => {
-      const info = await getObjInfo();
-      const problems = [];
-      let hasOut = false;
-      for (const n of nodesOf()) {
-        if (n.mode === 2 || n.mode === 4) continue;
-        const d = info[n.type];
-        if (!d) { problems.push(`#${n.id} ${n.type}: node type is not installed (missing custom node?)`); continue; }
-        if (d.output_node) hasOut = true;
-        for (const e of inputSpecs(d, 100000)) {
-          if (!e.required) continue;
-          const slot = (n.inputs || []).find((i) => i.name === e.name);
-          const linked = slot && slot.link != null;
-          if (e.type === "COMBO") {
-            const w = (n.widgets || []).find((x) => x.name === e.name);
-            if (!linked && w && e.options?.length && !e.options.includes(w.value)) problems.push(`#${n.id} ${n.type}: "${e.name}" = ${JSON.stringify(clipVal(w.value, 80))} is not available (${e.options.length} options)`);
-          } else if (!WIDGET_TYPES.has(e.type) && !linked) problems.push(`#${n.id} ${n.type}: required input "${e.name}" (${e.type}) is not connected`);
-        }
-      }
-      if (!hasOut) problems.push("No active output node (SaveImage / PreviewImage / ...) in the graph");
+      const problems = await canvasProblems();
       return problems.length ? problems.join("\n") : "No problems found.";
     },
   },
@@ -3238,7 +3333,6 @@ function askPlan(chat, args, signal) {
   });
 }
 
-// --- Roadmap: a live checklist the model creates and follows ---
 function cleanRoadmapSteps(raw) {
   const list = Array.isArray(raw) ? raw : [raw];
   const out = [];
@@ -3446,9 +3540,8 @@ const RETRY_SAFE_TOOLS = new Set([
   "list_subgraphs", "read_subgraph",
 ]);
 
-// Roadmap calls are shown by the roadmap card itself, so their tool rows stay
-// hidden unless something goes wrong.
 const QUIET_TOOLS = new Set(["create_roadmap", "update_roadmap"]);
+const AUTO_CHECK_SKIP = new Set(["create_workflow", "clear_graph"]);
 
 async function execTool(tc, ctx) {
   const key = resolveTool(tc.name);
@@ -3508,7 +3601,13 @@ async function execTool(tc, ctx) {
     step.progress = null;
     if (before) await reportCanvasChange(ctx.chat, before);
     step.status = "ok";
-    const text = clip(typeof out === "string" ? out : JSON.stringify(out), 24000);
+    let text = clip(typeof out === "string" ? out : JSON.stringify(out), 24000);
+    if (def.mutates && !AUTO_CHECK_SKIP.has(key)) {
+      try {
+        const problems = await canvasProblems();
+        if (problems.length) text = clip(`${text}\n\nCanvas check found problems you must fix before running or reporting success:\n${problems.join("\n")}`, 24000);
+      } catch {}
+    }
     step.out = clip(text, 1500);
     return text;
   } catch (e) {
@@ -3549,6 +3648,74 @@ function prepareMessages(chat) {
     }
     return m;
   });
+}
+
+const CTX_MAX_CHARS = 60000;
+const CTX_MAX_MSGS = 30;
+const CTX_KEEP_MSGS = 10;
+
+function ctxChars(msgs) {
+  let n = 0;
+  for (const m of msgs) {
+    if (typeof m.content === "string") n += m.content.length;
+    else if (Array.isArray(m.content)) for (const p of m.content) if (p.type === "text" && p.text) n += p.text.length;
+  }
+  return n;
+}
+
+function compactStart(msgs) {
+  let i = Math.max(0, msgs.length - CTX_KEEP_MSGS);
+  while (i > 0 && msgs[i].role !== "user") i--;
+  return i;
+}
+
+function compactGoal(chat) {
+  const m = chat.messages.find((x) => x.role === "user" && !x.nudge);
+  return m ? clip(msgText(m).replace(/<references>[\s\S]*<\/references>/g, ""), 2000) : "";
+}
+
+function compactTranscript(msgs, upTo) {
+  const lines = [];
+  for (const m of msgs.slice(0, upTo)) {
+    if (m.nudge) continue;
+    let text = clip(msgText(m).replace(/<references>[\s\S]*<\/references>/g, ""), m.role === "tool" ? 900 : 2500);
+    if (m.tool_calls?.length) text += "\n[calls] " + clip(JSON.stringify(m.tool_calls.map((tc) => ({ name: tc.name, arguments: tc.arguments }))), 1200);
+    if (text) lines.push(`${m.role === "assistant" ? "agent" : m.role}: ${text}`);
+  }
+  let out = lines.join("\n");
+  if (out.length > 56000) out = out.slice(0, 8000) + "\n…\n" + out.slice(-47000);
+  return out;
+}
+
+function localSummary(chat, upTo) {
+  const msgs = chat.messages.slice(0, upTo);
+  const said = msgs.filter((m) => m.role === "assistant" && m.content).slice(-5).map((m) => "- " + clip(msgText(m), 400));
+  const results = msgs.filter((m) => m.role === "tool").slice(-12).map((m) => "- " + clip(msgText(m), 180));
+  return ["Goal: " + (compactGoal(chat) || "continue the current task"), "", "Recent agent statements:", ...said, "", "Recent tool results:", ...results].join("\n").slice(0, 4000);
+}
+
+function withSummary(msgs, at, summary) {
+  return [{ role: "user", content: `[Earlier conversation compressed to save context]\n${summary}\n[End of compressed context. The goal and constraints above stay in force.]` }, ...msgs.slice(at)];
+}
+
+async function planMessages(chat, signal) {
+  const msgs = prepareMessages(chat);
+  if (!planOn()) return { messages: msgs, compacted: false };
+  if (chat.messages.length < CTX_MAX_MSGS && ctxChars(chat.messages) < CTX_MAX_CHARS) return { messages: msgs, compacted: false };
+  const at = compactStart(chat.messages);
+  if (at < 6) return { messages: msgs, compacted: false };
+  const cache = chat.ctx;
+  if (cache?.summary && at <= cache.upTo + CTX_KEEP_MSGS) return { messages: withSummary(msgs, cache.upTo, cache.summary), compacted: false };
+  let summary = "";
+  try {
+    const r = await post("/crazy_agent/compact", { goal: compactGoal(chat), transcript: compactTranscript(chat.messages, at), language: LANG.name }, signal);
+    summary = String(r?.summary || "").trim();
+  } catch (e) {
+    if (isAbort(e)) throw e;
+  }
+  if (!summary) summary = localSummary(chat, at);
+  chat.ctx = { upTo: at, summary };
+  return { messages: withSummary(msgs, at, summary), compacted: true };
 }
 
 const ANNOUNCE = /\b(i will|i'll|i am going to|i'm going to|let me(?! know)|i am (?:creating|building|adding|fixing|setting|making)|i'm (?:creating|building|adding|fixing|setting|making)|please wait|one moment|working on it|ich werde|ich erstelle|ich baue|bitte warten|je vais|je crée|je construis|veuillez patienter|zaraz|stworzę|tworzę|buduję|proszę poczekać)\b|сейчас\s+(?:создам|сделаю|построю|добавлю|исправлю|запущу|проверю|загружу|выполню|настрою|поменяю|обновлю)|создаю|строю|добавляю|исправляю|подожд|минутк|займусь/i;
@@ -3592,7 +3759,7 @@ async function runAgent(chat) {
   chat.running = true;
   chat.abort = new AbortController();
   const signal = chat.abort.signal;
-  let finished = false, nudges = 0, toolsUsed = 0, loopGuards = 0, repeats = 0;
+  let finished = false, nudges = 0, toolsUsed = 0, loopGuards = 0, repeats = 0, compactedShown = false;
   let lastSig = "", lastOutSig = "", hitLimit = false;
   const maxSteps = Math.max(1, Math.min(200, Number(S.cfg?.max_steps) || MAX_STEPS));
   const runStart = Date.now();
@@ -3638,9 +3805,14 @@ async function runAgent(chat) {
         }
       };
       let res = null, modelError = null;
+      const stepMsgs = await planMessages(chat, signal);
+      if (stepMsgs.compacted && !compactedShown) {
+        compactedShown = true;
+        pushView(chat, { kind: "note", text: t("ctxCompressed") });
+      }
       try {
         res = await callModel(
-          { messages: prepareMessages(chat), tools: toolDefs({ readOnly }), context: { perm: S.perm, language: LANG.name, packs, canvas: canvasSnapshot(), models, smalltalk: readOnly } },
+          { messages: stepMsgs.messages, tools: toolDefs({ readOnly }), context: { perm: S.perm, language: LANG.name, packs, canvas: canvasSnapshot(), models, smalltalk: readOnly } },
           signal,
           onEvent,
           (attempt) => {
@@ -4219,7 +4391,7 @@ function renderHeader() {
         h("button", { class: "ca-icon-btn", title: S.expanded ? t("collapse") : t("expand"), onClick: () => setExpanded(!S.expanded) }, icon(S.expanded ? "window-minimize" : "window-maximize")),
         h("button", { class: "ca-icon-btn" + (S.view === "settings" ? " on" : ""), title: t("settings"), onClick: () => { S.view = S.view === "settings" ? "chat" : "settings"; closePops(); renderAll(); } }, icon("cog")),
         h("button", { class: "ca-icon-btn", title: t("close"), onClick: closePanel }, icon("times")))),
-    h("button", { class: "ca-hist-btn", "data-pop": "1", onClick: () => { S.histOpen = !S.histOpen; S.permOpen = false; S.refMenu = null; renderPops(); } },
+    h("button", { class: "ca-hist-btn", "data-pop": "1", onClick: () => { S.histOpen = !S.histOpen; S.modeOpen = false; S.refMenu = null; renderPops(); } },
       icon("history"), h("span", {}, chat.title || t("untitled")),
       chat.running ? h("span", { class: "ca-dot run" }) : null, pending ? h("span", { class: "ca-dot warn" }) : null, icon("chevron-down")));
 }
@@ -4243,15 +4415,30 @@ function renderHist() {
   }
 }
 
-function renderPerm() {
-  const box = ui.permMenu;
+async function setPlanMode(on) {
+  const before = planOn();
+  if (before === !!on) return;
+  S.cfg = { ...(S.cfg || {}), plan_mode: !!on };
+  renderComposerState();
+  try {
+    S.cfg = await post("/crazy_agent/config", { plan_mode: !!on });
+  } catch (e) {
+    S.cfg = { ...(S.cfg || {}), plan_mode: before };
+    flash(e.message);
+  }
+  renderComposerState();
+}
+
+function renderMode() {
+  const box = ui.modeMenu;
   box.replaceChildren();
-  box.hidden = !S.permOpen;
-  if (!S.permOpen) return;
-  const opt = (id, ic, title, sub) => h("div", { class: "ca-perm-opt" + (S.perm === id ? " active" : ""), onClick: () => { S.perm = id; S.permOpen = false; renderPops(); renderComposerState(); saveSoon(); } },
-    icon(ic), h("div", { class: "ca-grow" }, h("div", { class: "ca-perm-t" }, title), h("div", { class: "ca-perm-s" }, sub)), S.perm === id ? icon("check") : null);
-  box.append(h("div", { class: "ca-pop-title" }, t("permTitle")), h("div", { class: "ca-pop-sub" }, t("permSub")),
-    opt("ask", "hand-paper", t("permAsk"), t("permAskSub")), opt("auto", "bolt", t("permAuto"), t("permAutoSub")));
+  box.hidden = !S.modeOpen;
+  if (!S.modeOpen) return;
+  const cur = planOn();
+  const opt = (plan, ic, title, sub) => h("div", { class: "ca-perm-opt" + (cur === plan ? " active" : ""), onClick: () => { S.modeOpen = false; renderPops(); if (cur !== plan) setPlanMode(plan); } },
+    icon(ic), h("div", { class: "ca-grow" }, h("div", { class: "ca-perm-t" }, title), h("div", { class: "ca-perm-s" }, sub)), cur === plan ? icon("check") : null);
+  box.append(h("div", { class: "ca-pop-title" }, t("modeTitle")), h("div", { class: "ca-pop-sub" }, t("modeSub")),
+    opt(true, "sitemap", t("planMode"), t("modePlanSub")), opt(false, "bolt", t("modeFast"), t("modeFastSub")));
 }
 
 function renderRefMenu() {
@@ -4301,12 +4488,12 @@ async function openRefList(kind) {
 }
 
 function openRefMenu(fromTyped) {
-  S.refMenu = { level: "root", fromTyped }; S.permOpen = false; S.histOpen = false;
+  S.refMenu = { level: "root", fromTyped }; S.modeOpen = false; S.histOpen = false;
   renderPops();
 }
 
-function renderPops() { renderHist(); renderPerm(); renderRefMenu(); }
-function closePops() { S.permOpen = false; S.histOpen = false; S.refMenu = null; renderPops(); }
+function renderPops() { renderHist(); renderMode(); renderRefMenu(); }
+function closePops() { S.modeOpen = false; S.histOpen = false; S.refMenu = null; renderPops(); }
 
 function renderChips() {
   ui.chips.replaceChildren(
@@ -4319,7 +4506,17 @@ function renderChips() {
 
 function renderComposerState() {
   const chat = activeChat();
-  ui.permBtn.replaceChildren(S.perm === "ask" ? t("ask") : t("auto"), icon("chevron-down"));
+  const plan = planOn();
+  ui.modeBtn.replaceChildren(icon(plan ? "sitemap" : "bolt"), plan ? t("modePlanShort") : t("modeFastShort"), icon("chevron-down"));
+  ui.modeBtn.classList.toggle("plan", plan);
+  ui.modeBtn.title = plan ? t("planMode") : t("modeFast");
+  ui.askSeg.classList.toggle("active", S.perm === "ask");
+  ui.autoSeg.classList.toggle("active", S.perm === "auto");
+  ui.askSeg.setAttribute("aria-pressed", String(S.perm === "ask"));
+  ui.autoSeg.setAttribute("aria-pressed", String(S.perm === "auto"));
+  ui.askSeg.title = t("permAskSub");
+  ui.autoSeg.title = t("permAutoSub");
+  ui.permSwitch.title = t("permTitle");
   ui.sendBtn.replaceChildren(icon(chat.running ? "stop" : "arrow-up"));
   ui.sendBtn.classList.toggle("stop", !!chat.running);
   ui.sendBtn.title = chat.running ? t("stopped") : "";
@@ -4368,7 +4565,8 @@ function renderSettings() {
   f.stream = h("input", { type: "checkbox" }); f.stream.checked = c.stream !== false;
   f.confirm = h("input", { type: "checkbox" }); f.confirm.checked = c.confirm_destructive !== false;
   f.highlight = h("input", { type: "checkbox" }); f.highlight.checked = c.highlight_changes !== false;
-  f.plan = h("input", { type: "checkbox" }); f.plan.checked = c.plan_mode === true;
+  f.updCheck = h("input", { type: "checkbox" }); f.updCheck.checked = c.update_check !== false;
+  f.updAuto = h("input", { type: "checkbox" }); f.updAuto.checked = c.auto_update === true;
   f.vision = h("input", { type: "checkbox" }); f.vision.checked = c.vision !== false;
   f.sugg = h("input", { type: "checkbox" }); f.sugg.checked = c.suggestions !== false;
   f.sprov = h("select", {}, SEARCH_PROVIDERS.map(([id, name]) => h("option", { value: id }, id === "off" ? t("searchOff") : name)));
@@ -4399,7 +4597,7 @@ function renderSettings() {
     } catch (e) { status.textContent = e.message; }
   } }, t("loadModels"));
   async function saveCfg(report = true) {
-    const body = { provider: f.provider.value, base_url: f.base.value, model: f.model.value, max_tokens: f.max.value, temperature: f.temp.value, max_steps: f.steps.value, stream: f.stream.checked, confirm_destructive: f.confirm.checked, highlight_changes: f.highlight.checked, plan_mode: f.plan.checked, vision: f.vision.checked, suggestions: f.sugg.checked, search_provider: f.sprov.value, search_url: f.surl.value, extra_prompt: f.extra.value };
+    const body = { provider: f.provider.value, base_url: f.base.value, model: f.model.value, max_tokens: f.max.value, temperature: f.temp.value, max_steps: f.steps.value, stream: f.stream.checked, confirm_destructive: f.confirm.checked, highlight_changes: f.highlight.checked, update_check: f.updCheck.checked, auto_update: f.updAuto.checked, vision: f.vision.checked, suggestions: f.sugg.checked, search_provider: f.sprov.value, search_url: f.surl.value, extra_prompt: f.extra.value };
     if (f.key.value) body.api_key = f.key.value;
     if (f.skey.value) body.search_key = f.skey.value;
     S.cfg = await post("/crazy_agent/config", body);
@@ -4411,10 +4609,13 @@ function renderSettings() {
   const saveBtn = h("button", { class: "ca-btn primary", onClick: async () => { try { await saveCfg(); } catch (e) { status.textContent = e.message; } } }, t("save"));
   const link = (href, ic, label) => h("a", { href, target: "_blank", rel: "noopener" }, icon(ic), label);
   const credit = h("div", { class: "ca-credit" },
-    h("div", { class: "ca-version" }, h("span", { class: "ca-version-badge", title: "ComfyUI-Agent beta 0.4.0" }, "beta 0.4.0")),
+    h("div", { class: "ca-version" }, h("span", { class: "ca-version-badge", title: "ComfyUI-Agent beta 0.4.5" }, "beta 0.4.5")),
     h("div", {}, "Created by CrazyDashTool"),
     h("div", { class: "ca-credit-links" }, link("https://github.com/CrazyDashTool", "github", "GitHub"), link("https://www.youtube.com/@CrazyDashToolOficial", "youtube", "YouTube")));
   const logBox = h("pre", { class: "ca-logbox", hidden: true });
+  const updStatus = h("div", { class: "ca-status" });
+  const updBtn = h("button", { class: "ca-btn", onClick: () => checkUpdates(true, updStatus) }, icon("refresh"), t("checkUpdates"));
+  const updApplyBtn = h("button", { class: "ca-btn", onClick: () => applyUpdate(updStatus) }, icon("download"), t("updateManual"));
   const logBtn = h("button", { class: "ca-btn", onClick: async () => {
     logBox.hidden = false;
     logBox.textContent = t("loading");
@@ -4442,12 +4643,17 @@ function renderSettings() {
     h("label", { class: "ca-check" }, f.stream, h("span", {}, t("streamOpt"))),
     h("label", { class: "ca-check" }, f.confirm, h("span", {}, t("confirmDestructive"))),
     h("label", { class: "ca-check" }, f.highlight, h("span", {}, t("highlightChanges"))),
-    h("label", { class: "ca-check" }, f.plan, h("span", {}, t("planMode"))),
     h("label", { class: "ca-check" }, f.vision, h("span", {}, t("vision"))),
     h("label", { class: "ca-check" }, f.sugg, h("span", {}, t("suggestionsOpt"))),
     field(t("webSearch"), f.sprov), searchKeyField, searchUrlField,
     field(t("extra"), f.extra),
     h("div", { class: "ca-inline" }, saveBtn, status),
+    h("div", { class: "ca-pop-title", style: { marginTop: "14px" } }, t("updateTitle")),
+    h("div", { class: "ca-pop-sub" }, t("updateSub")),
+    h("label", { class: "ca-check" }, f.updCheck, h("span", {}, t("updateCheckOpt"))),
+    h("label", { class: "ca-check" }, f.updAuto, h("span", {}, t("autoUpdateOpt"))),
+    h("div", { class: "ca-inline" }, updBtn, updApplyBtn),
+    updStatus,
     h("div", { class: "ca-pop-title", style: { marginTop: "14px" } }, t("logs")),
     h("div", { class: "ca-inline" }, logBtn),
     logBox,
@@ -4463,6 +4669,94 @@ function renderSettings() {
         h("button", { class: "ca-icon-btn sm", title: t("del"), onClick: async () => { await post("/crazy_agent/skills/delete", { name: s.name }); refreshSkills(); } }, icon("trash"))))
       : h("div", { class: "ca-pop-sub" }, t("noSkills")),
     credit);
+}
+
+let caAudio = null, soundQueued = false;
+
+function playUpdateSound() {
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return;
+  const chime = () => {
+    const t0 = caAudio.currentTime;
+    [[880, 0], [1318.5, 0.16]].forEach(([hz, at]) => {
+      const osc = caAudio.createOscillator(), gain = caAudio.createGain();
+      osc.type = "sine"; osc.frequency.value = hz;
+      gain.gain.setValueAtTime(0.0001, t0 + at);
+      gain.gain.exponentialRampToValueAtTime(0.12, t0 + at + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + at + 0.3);
+      osc.connect(gain).connect(caAudio.destination);
+      osc.start(t0 + at); osc.stop(t0 + at + 0.34);
+    });
+  };
+  try {
+    caAudio = caAudio || new Ctx();
+    if (caAudio.state === "running") chime();
+    else { soundQueued = true; caAudio.resume?.().then(() => { if (soundQueued) { soundQueued = false; chime(); } }).catch(() => {}); }
+  } catch (e) {}
+}
+
+function showUpdateBar(text, withButton) {
+  if (!ui.updateBar) return;
+  const kids = [icon("download"), h("div", { class: "ca-grow" }, text)];
+  if (withButton) kids.push(h("button", { class: "ca-btn-sm", onClick: () => applyUpdate() }, t("updateNow")));
+  kids.push(h("button", { class: "ca-icon-btn sm", title: t("updateLater"), onClick: () => { ui.updateBar.hidden = true; } }, icon("times")));
+  ui.updateBar.replaceChildren(...kids);
+  ui.updateBar.hidden = false;
+}
+
+async function applyUpdate(statusEl) {
+  showUpdateBar(t("updateChecking"), false);
+  try {
+    const r = await fj("/crazy_agent/update", { method: "POST", headers: { "Content-Type": "application/json", "X-Comfy-Agent": "1" }, body: "{}" });
+    const msg = r.updated ? `${t("updateApplied", { tag: r.to || "" })} ${t("updateRestart")}` : t("updateNone");
+    if (r.updated) console.info("[Agent] updated to", r.to);
+    showUpdateBar(msg, false);
+    if (statusEl) statusEl.textContent = msg;
+    if (!r.updated) setTimeout(() => { if (ui.updateBar) ui.updateBar.hidden = true; }, 5000);
+  } catch (e) {
+    console.warn("[Agent] update failed", e);
+    const msg = t("updateFailed", { err: e.message });
+    showUpdateBar(msg, false);
+    if (statusEl) statusEl.textContent = msg;
+  }
+}
+
+async function checkUpdates(manual = false, statusEl = null) {
+  if (S.updateBusy) return;
+  S.updateBusy = true;
+  if (manual && statusEl) statusEl.textContent = t("updateChecking");
+  try {
+    const st = await fj(`/crazy_agent/update${manual ? "?check=1" : ""}`);
+    if (!st.git) {
+      if (manual) { const m = t("updateNoGit"); if (statusEl) statusEl.textContent = m; else flash(m); }
+      return;
+    }
+    if (!st.available) {
+      if (manual) { const m = t("updateNone"); if (statusEl) statusEl.textContent = m; else flash(m); }
+      if (ui.updateBar) ui.updateBar.hidden = true;
+      return;
+    }
+    const tag = st.latest || "GitHub";
+    if (!manual) playUpdateSound();
+    if (st.dirty) {
+      const m = `${t("updateAvailable", { tag })} ${t("updateDirty")}`;
+      showUpdateBar(m, false);
+      if (manual && statusEl) statusEl.textContent = m;
+      return;
+    }
+    if (S.cfg?.auto_update !== true) {
+      const m = t("updateAvailable", { tag });
+      showUpdateBar(m, true);
+      if (manual && statusEl) statusEl.textContent = m;
+      return;
+    }
+    await applyUpdate(statusEl);
+  } catch (e) {
+    if (manual) {
+      const m = t("updateFailed", { err: e.message });
+      if (statusEl) statusEl.textContent = m; else flash(m);
+    }
+  } finally { S.updateBusy = false; }
 }
 
 function renderBody() {
@@ -4552,9 +4846,13 @@ function buildRoot() {
   ui.chips = h("div", { class: "ca-chips in", hidden: true });
   ui.input = h("textarea", { class: "ca-input", rows: "2", placeholder: t("placeholder") });
   ui.fileInput = h("input", { type: "file", accept: "image/*,video/*,audio/*,.json,.jsonl,.txt,.md,.csv,.yaml,.yml,.log,.xml", multiple: true, hidden: true });
-  ui.permBtn = h("button", { class: "ca-mode", "data-pop": "1", onClick: () => { S.permOpen = !S.permOpen; S.histOpen = false; S.refMenu = null; renderPops(); } });
+  ui.modeBtn = h("button", { class: "ca-mode", "data-pop": "1", onClick: () => { S.modeOpen = !S.modeOpen; S.histOpen = false; S.refMenu = null; renderPops(); } });
+  const seg = (id, label) => h("button", { class: "ca-seg", type: "button", onClick: () => { S.perm = id; renderComposerState(); saveSoon(); } }, label);
+  ui.askSeg = seg("ask", t("ask"));
+  ui.autoSeg = seg("auto", t("auto"));
+  ui.permSwitch = h("div", { class: "ca-perm-switch", role: "group" }, ui.askSeg, ui.autoSeg);
   ui.sendBtn = h("button", { class: "ca-send", onClick: () => (activeChat().running ? stop() : send()) });
-  ui.permMenu = h("div", { class: "ca-pop ca-perm", hidden: true });
+  ui.modeMenu = h("div", { class: "ca-pop ca-perm", hidden: true });
   ui.refMenu = h("div", { class: "ca-pop ca-ref", hidden: true });
 
   ui.input.addEventListener("input", () => {
@@ -4578,18 +4876,21 @@ function buildRoot() {
       h("div", { class: "ca-row" },
         ui.attachBtn = h("button", { class: "ca-icon-btn", title: t("attach"), onClick: () => ui.fileInput.click() }, icon("plus")),
         ui.refBtn = h("button", { class: "ca-icon-btn at", "data-pop": "1", title: t("reference"), onClick: () => (S.refMenu ? closePops() : openRefMenu(false)) }, "@"),
-        h("span", { class: "ca-grow" }), ui.permBtn, ui.sendBtn),
-      ui.permMenu, ui.refMenu),
+        h("span", { class: "ca-grow" }),
+        h("div", { class: "ca-mode-stack" }, ui.modeBtn, ui.permSwitch),
+        ui.sendBtn),
+      ui.modeMenu, ui.refMenu),
     ui.fileInput);
 
-  ui.root = h("div", { class: "ca-root" }, ui.header, ui.histMenu, ui.msgs, ui.settings, ui.composer, ui.toast);
+  ui.updateBar = h("div", { class: "ca-update", hidden: true });
+  ui.root = h("div", { class: "ca-root" }, ui.header, ui.updateBar, ui.histMenu, ui.msgs, ui.settings, ui.composer, ui.toast);
   ["dragover", "drop"].forEach((ev) => ui.root.addEventListener(ev, (e) => {
     if (![...(e.dataTransfer?.types || [])].includes("Files")) return;
     e.preventDefault();
     if (ev === "drop") attachFiles([...e.dataTransfer.files]);
   }));
   document.addEventListener("pointerdown", (e) => {
-    if ((S.permOpen || S.histOpen || S.refMenu) && !e.target.closest?.(".ca-pop, [data-pop]")) closePops();
+    if ((S.modeOpen || S.histOpen || S.refMenu) && !e.target.closest?.(".ca-pop, [data-pop]")) closePops();
   });
   setInterval(() => { if (ui.root.isConnected) updateWfChip(); }, 2000);
 }
@@ -4606,6 +4907,11 @@ app.registerExtension({
     try { S.cfg = await fj("/crazy_agent/config"); } catch (e) { console.warn("[Agent] config unavailable", e); }
     buildRoot();
     renderAll();
+    document.addEventListener("pointerdown", () => {
+      if (!soundQueued || !caAudio) return;
+      caAudio.resume?.().then(() => { if (soundQueued) { soundQueued = false; playUpdateSound(); } }).catch(() => {});
+    }, { capture: true });
+    setTimeout(() => { if (S.cfg?.update_check !== false) checkUpdates(false); }, 2500);
     if (!app.extensionManager?.registerSidebarTab) { console.warn("[Agent] sidebar API is not available: update the ComfyUI frontend"); return; }
     app.extensionManager.registerSidebarTab({
       id: TAB_ID, icon: "pi pi-comments", title: t("title"), tooltip: t("tooltip"), type: "custom",

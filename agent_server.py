@@ -6,6 +6,8 @@ import os
 import random
 import re
 import socket
+import subprocess
+import time
 from urllib.parse import urlencode, urljoin, urlparse
 
 import aiohttp
@@ -31,6 +33,8 @@ DEFAULTS = {
     "confirm_destructive": True,
     "highlight_changes": True,
     "plan_mode": False,
+    "update_check": True,
+    "auto_update": False,
     "search_provider": "off",
     "search_key": "",
     "search_url": "",
@@ -53,6 +57,7 @@ GOLDEN RULES
 10. A task that needs 3 or more actions starts with create_roadmap as your FIRST tool call, before reading or editing anything; then call update_roadmap after each step. A one-step request, greeting or question never needs a roadmap.
 11. The CURRENT CANVAS block starts with the exact workflow name and a content summary (purpose, main model files, output, sampler, prompts). When the user asks which workflow is open, what it does or which models it uses, answer from that block with the exact name, the purpose and the model files. Never invent a different name, a suffix such as "(2)", or another title; the tab name alone is not an answer. If a detail is missing, call get_graph. Such a question is a plain question: no roadmap and no canvas changes.
 12. Unknown or new models: when a model file, family or repo is unfamiliar, or the user asks what a model is, what it does or how to use it, call model_lookup(name) BEFORE answering or building. It searches the official Hugging Face hub and returns the repo URL, pipeline, tags, files and a README excerpt. Build and answer from that data, name the repo id, and never guess an architecture from the file name. model_lookup works even when web search is off.
+13. Every canvas edit ends with an automatic canvas check. If a tool result contains "Canvas check found problems", fix them before running or reporting success. Never claim that a file was loaded or a value was set unless the tool result confirms that exact value; tool results show the values actually applied.
 
 ROADMAP
 - create_roadmap takes a one-line summary and 2-8 short concrete steps. It is a progress display, not a question: keep working after creating it.
@@ -181,10 +186,16 @@ def build_system(cfg, ctx):
         parts.append("Additional instructions from the user:\n" + cfg["extra_prompt"])
     if cfg.get("plan_mode"):
         parts.append(
-            "PLAN MODE is on. Before touching the canvas, call propose_plan with a short numbered plan of the concrete steps "
-            "and wait for the answer. Start executing only after the user approves the plan. If the user asks for changes, "
-            "call propose_plan again with the revised plan. Your very first reply in a task must be the plan, not a canvas edit. "
-            "When the plan is approved a roadmap is created automatically: follow it and call update_roadmap after each step."
+            "PLAN MODE is on. Work like a careful planner. "
+            "1) Before touching the canvas, call propose_plan with a short numbered plan of the concrete steps and wait for the answer. "
+            "Your very first reply in a task must be the plan, not a canvas edit; start executing only after the user approves it. "
+            "2) An approved plan becomes a roadmap automatically: follow it, call update_roadmap after every step and keep exactly one step in progress. "
+            "3) Re-check the path after each significant result (validation, run output, error, new discovery). If the goal, the canvas or the facts changed, "
+            "call propose_plan again with the revised plan and say what changed instead of silently continuing; update the roadmap when its steps no longer match. "
+            "4) Ask instead of guessing: when a choice really matters (model, resolution, count, style, destructive action, ambiguous goal), call ask_user "
+            "with short ready-made options more often than in fast mode, but never more than one question at a time. "
+            "5) Long tasks keep the goal explicit: when you re-plan or resume after a long tool chain, restate the current goal and hard constraints in one line, "
+            "so they survive context compression."
         )
     if ctx.get("smalltalk"):
         parts.append(
@@ -266,7 +277,6 @@ AUDIO_FORMATS = {"mpeg": "mp3", "mp3": "mp3", "x-wav": "wav", "wav": "wav", "wav
 
 
 def media_part(part, vision, gemini):
-    """Map an attachment part to an OpenAI-compatible content part."""
     kind = part.get("type")
     url = part.get("data_url") or ""
     mime, b64 = split_data_url(url)
@@ -278,7 +288,6 @@ def media_part(part, vision, gemini):
         sub = (mime or "").split(";")[0].split("/")[-1].lower()
         return {"type": "input_audio", "input_audio": {"data": b64, "format": AUDIO_FORMATS.get(sub, sub or "wav")}}
     if kind == "video":
-        # The video_url content part is only understood by Gemini-compatible endpoints.
         if gemini and b64:
             return {"type": "video_url", "video_url": {"url": url}}
         return {"type": "text", "text": "[video attached, but this provider cannot read video: " + (part.get("name") or "video") + "]"}
@@ -428,8 +437,6 @@ def safe_args(raw):
     start, end = text.find("{"), text.rfind("}")
     if start >= 0 and end > start:
         text = text[start:end + 1]
-    # Try the text as-is, then with common LLM mistakes repaired: trailing commas,
-    # Python literals (None/True/False) and single-quoted strings.
     py = re.sub(r"\bNone\b", "null", text)
     py = re.sub(r"\bTrue\b", "true", py)
     py = re.sub(r"\bFalse\b", "false", py)
@@ -575,7 +582,6 @@ def split_reasoning(content, reasoning):
 
 
 def norm_usage(u):
-    """Normalizes OpenAI and Anthropic usage payloads to one shape."""
     if not isinstance(u, dict):
         return None
     prompt = u.get("prompt_tokens", u.get("input_tokens"))
@@ -589,7 +595,6 @@ def norm_usage(u):
 
 
 async def iter_sse(content):
-    """Yield the data payload of each Server-Sent Event from an aiohttp response content."""
     data = []
     async for raw in content:
         line = raw.decode("utf-8", errors="replace").rstrip("\r\n")
@@ -908,6 +913,108 @@ def read_log_lines(tail=80, needle=""):
     return out[-tail:]
 
 
+COMPACT_SYSTEM = (
+    "You compress a long working conversation between a user and a ComfyUI agent so the agent can continue the same task. "
+    "Write compact plain text (no tables, no code fences) under 1200 words. Keep, in this order: "
+    "1) the user's goal and hard constraints, quoting them where possible; 2) the current plan or roadmap and the state of its steps; "
+    "3) decisions already made and why; 4) canvas changes already applied (workflow name, node ids and types, key widget values, links); "
+    "5) tool results that still matter (errors and fixes, model files, node types, generation file names); "
+    "6) open questions, approvals and what is still pending. "
+    "Drop greetings, repeated explanations and stale tool output. Never invent facts and never continue the task."
+)
+
+UPDATE_CACHE = {"at": 0.0, "data": None}
+UPDATE_TTL = 300
+UPDATE_LOCK = asyncio.Lock()
+
+
+def _git(*args, timeout=60):
+    env = dict(os.environ, GIT_TERMINAL_PROMPT="0")
+    try:
+        p = subprocess.run(
+            ["git", "-C", ROOT, *args],
+            capture_output=True, text=True, timeout=timeout,
+            encoding="utf-8", errors="replace", env=env,
+        )
+    except FileNotFoundError:
+        raise LLMError("git is not installed")
+    except subprocess.TimeoutExpired:
+        raise LLMError("git timed out")
+    return p.returncode, (p.stdout or "").strip(), (p.stderr or "").strip()
+
+
+def _git_out(*args, timeout=60):
+    code, out, err = _git(*args, timeout=timeout)
+    if code != 0:
+        raise LLMError((err or out or f"git exited with {code}")[:300])
+    return out
+
+
+def _update_check(force=False):
+    now = time.time()
+    cached = UPDATE_CACHE.get("data")
+    if not force and cached and now - UPDATE_CACHE.get("at", 0) < UPDATE_TTL:
+        return cached
+    code, _, _ = _git("rev-parse", "--is-inside-work-tree", timeout=10)
+    if code != 0:
+        data = {"ok": True, "git": False, "branch": "", "current": "", "latest": "", "latest_subject": "",
+                "behind": 0, "ahead": 0, "dirty": False, "available": False, "files": []}
+        UPDATE_CACHE.update(at=now, data=data)
+        return data
+    branch = _git_out("rev-parse", "--abbrev-ref", "HEAD", timeout=10)
+    data = {
+        "ok": True, "git": True, "branch": branch, "current": _git_out("rev-parse", "--short", "HEAD", timeout=10),
+        "latest": "", "latest_subject": "", "behind": 0, "ahead": 0,
+        "dirty": bool(_git_out("status", "--porcelain", "--untracked-files=no", timeout=20)),
+        "available": False, "files": [],
+    }
+    fetch_code, _, fetch_err = _git("fetch", "--quiet", "origin", branch, timeout=90)
+    remote = f"origin/{branch}"
+    code, _, _ = _git("rev-parse", "--verify", "--quiet", remote, timeout=10)
+    if fetch_code != 0 and code != 0:
+        raise LLMError(("Cannot reach GitHub: " + (fetch_err or "fetch failed"))[:300])
+    if code == 0:
+        counts = _git_out("rev-list", "--left-right", "--count", f"HEAD...{remote}", timeout=20).split()
+        if len(counts) == 2:
+            data["ahead"], data["behind"] = int(counts[0]), int(counts[1])
+        data["latest"] = _git_out("rev-parse", "--short", remote, timeout=10)
+        data["latest_subject"] = _git_out("log", "--max-count=1", "--format=%s", f"HEAD..{remote}", timeout=10)[:200]
+        if data["behind"] > 0:
+            files = _git_out("diff", "--name-status", f"HEAD..{remote}", timeout=20).splitlines()
+            data["files"] = [line[:200] for line in files[:100]]
+        data["available"] = data["behind"] > 0
+    UPDATE_CACHE.update(at=now, data=data)
+    return data
+
+
+def _update_apply():
+    data = _update_check(force=True)
+    if not data.get("git"):
+        raise LLMError("This extension is not a git checkout, so it cannot update itself.")
+    if data.get("dirty"):
+        raise LLMError("The extension folder has local changes; update skipped.")
+    if not data.get("available"):
+        return {"updated": False, "current": data.get("current", "")}
+    branch = data.get("branch") or "main"
+    if branch != "main":
+        raise LLMError(f"Only the main branch updates automatically (current branch: {branch}).")
+    before = _git_out("rev-parse", "HEAD", timeout=10)
+    _git_out("merge", "--ff-only", f"origin/{branch}", timeout=120)
+    after = _git_out("rev-parse", "--short", "HEAD", timeout=10)
+    count = _git_out("rev-list", "--count", f"{before}..HEAD", timeout=20)
+    UPDATE_CACHE.update(at=0.0, data=None)
+    return {"updated": True, "from": data.get("current", ""), "to": after, "commits": int(count or 0), "restart_required": True}
+
+
+def _update_allowed(request):
+    if request.headers.get("X-Comfy-Agent") != "1":
+        return False
+    remote = str(request.remote or "")
+    if remote.startswith("::ffff:"):
+        remote = remote[7:]
+    return remote in ("127.0.0.1", "::1")
+
+
 def setup_routes():
     routes = PromptServer.instance.routes
 
@@ -953,6 +1060,10 @@ def setup_routes():
             cfg["highlight_changes"] = bool(body["highlight_changes"])
         if "plan_mode" in body:
             cfg["plan_mode"] = bool(body["plan_mode"])
+        if "update_check" in body:
+            cfg["update_check"] = bool(body["update_check"])
+        if "auto_update" in body:
+            cfg["auto_update"] = bool(body["auto_update"])
         for key, minimum, maximum in (("max_steps", 1, 200), ("max_retries", 0, 5)):
             if key in body:
                 try:
@@ -1179,6 +1290,52 @@ def setup_routes():
             return web.json_response({"text": await fetch_page(str(body.get("url") or "").strip())})
         except (LLMError, aiohttp.ClientError, asyncio.TimeoutError) as e:
             return err(str(e) or e.__class__.__name__, 502)
+
+    @routes.post("/crazy_agent/compact")
+    async def compact(request):
+        try:
+            body = await request.json()
+        except Exception:
+            return err("Bad JSON")
+        cfg = load_config()
+        problem = config_problem(cfg)
+        if problem:
+            return err(problem)
+        transcript = str(body.get("transcript") or "")[:60000]
+        if not transcript.strip():
+            return err("Nothing to compress")
+        goal = str(body.get("goal") or "").strip()[:2000]
+        lang = str(body.get("language") or "English")[:40]
+        system = COMPACT_SYSTEM + f" Write the summary in {lang}, keeping node names, file names and identifiers unchanged."
+        user = "CURRENT GOAL (preserve it):\n" + (goal or "(derive it from the conversation)") + "\n\nCONVERSATION:\n" + transcript
+        try:
+            summary = (await complete_text(cfg, system, user)).strip()[:8000]
+        except (LLMError, aiohttp.ClientError, asyncio.TimeoutError) as e:
+            return err(str(e) or e.__class__.__name__, 502)
+        if not summary:
+            return err("The model returned an empty summary", 502)
+        return web.json_response({"summary": summary})
+
+    @routes.get("/crazy_agent/update")
+    async def update_status(request):
+        force = request.query.get("check") == "1"
+        async with UPDATE_LOCK:
+            try:
+                data = await asyncio.to_thread(_update_check, force)
+            except LLMError as e:
+                return err(str(e), 502)
+        return web.json_response(data)
+
+    @routes.post("/crazy_agent/update")
+    async def update_apply(request):
+        if not _update_allowed(request):
+            return err("Updates are allowed only from this computer.", 403)
+        async with UPDATE_LOCK:
+            try:
+                data = await asyncio.to_thread(_update_apply)
+            except LLMError as e:
+                return err(str(e), 400)
+        return web.json_response(data)
 
     @routes.get("/crazy_agent/skills")
     async def get_skills(request):
