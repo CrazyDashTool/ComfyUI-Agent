@@ -1,3 +1,4 @@
+<img width="2172" height="724" alt="comfyagentlogo" src="https://github.com/user-attachments/assets/6b4b0ce9-dc37-4bc6-a43d-fc2a255ab26a" />
 # ComfyUI-Agent
 
 An in-app AI agent for ComfyUI: a sidebar chat that sees the live canvas, builds and edits workflows, validates and runs them, reads the results, and can research unfamiliar models on Hugging Face. It is a local, bring-your-own-model alternative to the built-in Comfy Agent.
