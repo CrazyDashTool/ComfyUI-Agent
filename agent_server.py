@@ -1,14 +1,16 @@
 import asyncio
+import hashlib
 import html
 import ipaddress
 import json
 import os
 import random
 import re
+import shutil
 import socket
 import subprocess
 import time
-from urllib.parse import urlencode, urljoin, urlparse
+from urllib.parse import quote, unquote, urlencode, urljoin, urlparse
 
 import aiohttp
 from aiohttp import web
@@ -17,6 +19,9 @@ from server import PromptServer
 ROOT = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(ROOT, "config.json")
 SKILLS_DIR = os.path.join(ROOT, "skills")
+KNOWLEDGE_DIR = os.path.join(ROOT, "knowledge")
+HF_HOSTS = {"huggingface.co", "www.huggingface.co", "hf.co"}
+DOWNLOAD_LOCK = asyncio.Lock()
 
 DEFAULTS = {
     "provider": "openai",
@@ -58,6 +63,7 @@ GOLDEN RULES
 11. The CURRENT CANVAS block starts with the exact workflow name and a content summary (purpose, main model files, output, sampler, prompts). When the user asks which workflow is open, what it does or which models it uses, answer from that block with the exact name, the purpose and the model files. Never invent a different name, a suffix such as "(2)", or another title; the tab name alone is not an answer. If a detail is missing, call get_graph. Such a question is a plain question: no roadmap and no canvas changes.
 12. Unknown or new models: when a model file, family or repo is unfamiliar, or the user asks what a model is, what it does or how to use it, call model_lookup(name) BEFORE answering or building. It searches the official Hugging Face hub and returns the repo URL, pipeline, tags, files and a README excerpt. Build and answer from that data, name the repo id, and never guess an architecture from the file name. model_lookup works even when web search is off.
 13. Every canvas edit ends with an automatic canvas check. If a tool result contains "Canvas check found problems", fix them before running or reporting success. Never claim that a file was loaded or a value was set unless the tool result confirms that exact value; tool results show the values actually applied.
+14. The user shares the canvas with you. If a tool result says the user changed nodes while you were working, do not overwrite those nodes: call get_graph, re-read the current values, and re-apply only your intended change.
 
 ROADMAP
 - create_roadmap takes a one-line summary and 2-8 short concrete steps. It is a progress display, not a question: keep working after creating it.
@@ -69,7 +75,19 @@ RECIPES (follow them exactly)
 - Make or build a workflow for z-image, flux, qwen-image or SD/SDXL: create_workflow(template=...), then run_workflow if the user wants an image. For anything else: find_nodes, then build_graph.
 - Change a setting (seed, steps, cfg, size, sampler, scheduler): set_param(name, value).
 - Fix errors: when a run fails call diagnose_error first — it names the failing node, the exception and concrete fixes. Validate and fix what it lists, run again, repeat. If it says there is nothing recorded, or the cause is unclear, call get_server_logs (optionally with grep) to read the real traceback.
+- Hardware, Python, torch, CUDA and package questions, or "why is it slow / out of memory": call get_environment for the real facts before recommending settings.
+- Model file details (architecture tensors, parameters, dtype, metadata) or picking between files: inspect_model. Which packs are installed or disabled: list_node_packs; enable/disable a pack only when the user asks, then tell them a restart is required.
+- Whole-graph review, unused nodes, missing inputs, model/VRAM mismatch, sampler or resolution advice: analyze_workflow and get_environment, then report concrete findings. These are read-only; ask before applying changes.
+- Before a risky rebuild or when the user wants history: save_workflow_version with a short note. list_workflow_versions and restore_workflow_version bring an earlier graph back (a safety version is saved first).
+- Queue and execution state: get_queue shows running and pending prompts. cancel_execution stops the current run or removes a pending one; never cancel unless the user asks.
+- "Remember ...": remember saves one short project fact (preferred model, style, hardware limits, naming). list_memory and forget_memory manage them. Saved memory is injected below; apply it without repeating it.
+- Look at an image, video, audio or 3D file before using it: inspect_media with the exact folder path. It reports size, duration, average color, 3D structure and attaches a preview frame when vision is on.
 - Questions about nodes or custom node packs: get_node_info, list_custom_nodes, get_custom_node_docs.
+- Files on disk (images, video, audio, 3D models, checkpoints, loras): list_assets. Use the exact returned names in loader widgets. Native 3D formats: glb, gltf, obj, fbx, stl, ply, spz, splat.
+- Before editing one node, especially a custom node: inspect_node(id) for every widget value, combo sample, link and definition.
+- ComfyUI model families, samplers, workflow patterns, node packs and common errors: call search_knowledge before guessing. It searches the curated local reference.
+- A missing model: download_model takes a Hugging Face repo id plus file (or a huggingface.co .../resolve/... URL) and a models folder such as checkpoints, diffusion_models, loras or vae. It asks the user first and never overwrites without permission.
+- A missing custom node pack: install_custom_node clones a public GitHub repo into custom_nodes. It asks the user first; tell them to restart ComfyUI and install the pack requirements if the result lists any.
 - Unknown or new model, or "what is <model>, what does it do, how do I use it": call model_lookup with the file name, repo id or model name first. Answer from the returned official Hugging Face data (pipeline, tags, files, README excerpt) and name the repo id. If it finds nothing, ask for the exact repo id instead of guessing.
 - Which workflow is open, what it does, which models it uses: answer from the CURRENT CANVAS summary (exact name, purpose, main files, output); call get_graph only if a detail is missing. Do not edit anything.
 - Subgraphs (nested graphs): the canvas snapshot shows only the top level, so call list_subgraphs and read_subgraph to see inside. edit_subgraph changes inner widget values, titles, mute/bypass and deletes inner nodes; create_subgraph turns selected canvas nodes into a subgraph; enter_subgraph and exit_subgraph only move the canvas view for the user.
@@ -170,6 +188,15 @@ def build_system(cfg, ctx):
         parts.append("Available skills:\n" + "\n".join(f"- {s['name']}: {s['description']}" for s in skills))
     else:
         parts.append("Available skills: none yet.")
+    try:
+        docs = {}
+        for d in knowledge_docs():
+            docs.setdefault(d["file"], d["doc"])
+        if docs:
+            parts.append("Curated knowledge base (local reference; call search_knowledge for details):\n"
+                         + "\n".join(f"- {title}" for title in list(docs.values())[:12]))
+    except Exception:
+        pass
     ctx = ctx or {}
     parts.append(f"Reply language: {ctx.get('language') or 'English'}.")
     packs = str(ctx.get("packs") or "").strip()
@@ -203,6 +230,15 @@ def build_system(cfg, ctx):
             "Do not call mutating tools, do not run workflows, do not create or update a roadmap, and do not change the canvas. "
             "Reply conversationally; if the user attached something, you may inspect it with read-only tools."
         )
+    target = ctx.get("target") or {}
+    if isinstance(target, dict) and target.get("name"):
+        parts.append(
+            "PINNED WORKFLOW: the user and you are working on \"" + str(target["name"]) + "\". "
+            "Mutating tools are blocked if the active workflow differs; do not switch workflows silently."
+        )
+    memory = ctx.get("memory") or []
+    if memory:
+        parts.append("SAVED PROJECT MEMORY (apply it as a default, do not repeat it back):\n" + "\n".join(f"- {m}" for m in memory[:20]))
     models = str(ctx.get("models") or "").strip()
     if models:
         parts.append("MODEL FILES ON DISK:\n" + models[:2500])
@@ -823,6 +859,449 @@ def pack_docs(path):
     return out
 
 
+KNOWLEDGE_CACHE = {"at": 0.0, "docs": []}
+ASSET_CACHE = {"at": 0.0, "rows": []}
+ASSET_TTL = 60
+ASSET_LIMIT = 6000
+ASSET_SKIP = {".git", "__pycache__", "node_modules", ".cache", ".venv", "venv", "site-packages", ".pytest_cache", ".mypy_cache"}
+ASSET_EXTS = {
+    "image": {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff", ".avif", ".heic"},
+    "video": {".mp4", ".webm", ".mov", ".mkv", ".avi", ".m4v"},
+    "audio": {".wav", ".mp3", ".flac", ".ogg", ".opus", ".m4a", ".aac", ".aiff"},
+    "3d": {".glb", ".gltf", ".obj", ".fbx", ".stl", ".ply", ".spz", ".splat", ".ksplat", ".usdz", ".3ds", ".dae", ".abc"},
+    "model": {".safetensors", ".ckpt", ".pt", ".pth", ".bin", ".gguf", ".sft", ".onnx"},
+}
+
+
+def knowledge_docs():
+    if KNOWLEDGE_CACHE["docs"] and time.time() - KNOWLEDGE_CACHE["at"] < 300:
+        return KNOWLEDGE_CACHE["docs"]
+    docs = []
+    try:
+        names = sorted(os.listdir(KNOWLEDGE_DIR))
+    except OSError:
+        names = []
+    for fn in names:
+        if not fn.lower().endswith(".md"):
+            continue
+        try:
+            raw = read_text(os.path.join(KNOWLEDGE_DIR, fn), 40000)
+        except OSError:
+            continue
+        title, tags, body = fn[:-3], [], raw
+        meta = re.match(r"^---\s*\n(.*?)\n---\s*\n?(.*)$", raw, re.S)
+        if meta:
+            head, body = meta.group(1), meta.group(2)
+            m = re.search(r"^title:\s*(.+)$", head, re.M)
+            if m:
+                title = m.group(1).strip().strip('"')
+            m = re.search(r"^tags:\s*(.+)$", head, re.M)
+            if m:
+                tags = [x.strip().strip('"') for x in m.group(1).split(",") if x.strip()]
+        chunks, heading, lines = [], title, []
+        for line in body.splitlines():
+            if line.startswith("## "):
+                if lines and any(x.strip() for x in lines):
+                    chunks.append((heading, "\n".join(lines).strip()))
+                heading, lines = line[3:].strip(), []
+            else:
+                lines.append(line)
+        if lines and any(x.strip() for x in lines):
+            chunks.append((heading, "\n".join(lines).strip()))
+        for heading, text in chunks:
+            docs.append({
+                "file": fn,
+                "doc": title,
+                "tags": tags,
+                "section": heading,
+                "text": text,
+                "hay": f"{title} {' '.join(tags)} {heading} {text}".lower(),
+            })
+    KNOWLEDGE_CACHE.update(at=time.time(), docs=docs)
+    return docs
+
+
+def knowledge_search(query, limit=3):
+    toks = re.findall(r"[\w.+-]{2,}", str(query or "").lower())[:10]
+    if not toks:
+        return []
+    scored = []
+    for d in knowledge_docs():
+        score = 0
+        for tok in toks:
+            hits = min(d["hay"].count(tok), 20)
+            score += hits * (3 if tok in d["section"].lower() or tok in d["doc"].lower() else 1)
+        if score and all(tok in d["hay"] for tok in toks):
+            score += 10
+        if score:
+            scored.append((score, d))
+    scored.sort(key=lambda x: (-x[0], x[1]["file"]))
+    return [
+        {"source": d["file"], "doc": d["doc"], "section": d["section"], "text": d["text"][:2400]}
+        for _, d in scored[: max(1, min(int(limit or 3), 6))]
+    ]
+
+
+def asset_kind(name):
+    ext = os.path.splitext(str(name or ""))[1].lower()
+    for kind, exts in ASSET_EXTS.items():
+        if ext in exts:
+            return kind
+    return ""
+
+
+def _scan_assets_dir(base, root_name, folder_name, limit):
+    rows = []
+    real_base = os.path.realpath(base)
+    if not os.path.isdir(real_base):
+        return rows
+    for dirpath, dirnames, filenames in os.walk(real_base):
+        depth = 0 if dirpath == real_base else os.path.relpath(dirpath, real_base).count(os.sep) + 1
+        dirnames[:] = sorted(d for d in dirnames if not d.startswith(".") and d.lower() not in ASSET_SKIP)
+        if depth >= 5:
+            dirnames[:] = []
+        for fn in sorted(filenames):
+            if fn.startswith("."):
+                continue
+            kind = asset_kind(fn)
+            if not kind:
+                continue
+            full = os.path.join(dirpath, fn)
+            try:
+                st = os.stat(full)
+            except OSError:
+                continue
+            if not os.path.isfile(full):
+                continue
+            rows.append({
+                "name": fn,
+                "path": os.path.relpath(full, real_base).replace(os.sep, "/"),
+                "root": root_name,
+                "folder": folder_name,
+                "kind": kind,
+                "size": st.st_size,
+                "mtime": int(st.st_mtime),
+            })
+            if limit and len(rows) >= limit:
+                return rows
+    return rows
+
+
+def scan_assets():
+    if ASSET_CACHE["rows"] and time.time() - ASSET_CACHE["at"] < ASSET_TTL:
+        return ASSET_CACHE["rows"]
+    rows, seen = [], set()
+    try:
+        import folder_paths
+        for folder in sorted(folder_paths.folder_names_and_paths):
+            try:
+                bases = folder_paths.get_folder_paths(folder)
+            except Exception:
+                continue
+            for base in bases:
+                real = os.path.realpath(base)
+                if real in seen or not os.path.isdir(real):
+                    continue
+                seen.add(real)
+                room = ASSET_LIMIT - len(rows)
+                if room <= 0:
+                    break
+                rows += _scan_assets_dir(real, "models", folder, room)
+        for root_name, getter in (
+            ("input", folder_paths.get_input_directory),
+            ("output", folder_paths.get_output_directory),
+            ("temp", folder_paths.get_temp_directory),
+        ):
+            try:
+                real = os.path.realpath(getter())
+            except Exception:
+                continue
+            if real in seen or not os.path.isdir(real):
+                continue
+            seen.add(real)
+            room = ASSET_LIMIT - len(rows)
+            if room > 0:
+                rows += _scan_assets_dir(real, root_name, root_name, room)
+    except Exception:
+        pass
+    rows.sort(key=lambda r: (r["root"] != "input", r["folder"], r["path"]))
+    ASSET_CACHE.update(at=time.time(), rows=rows)
+    return rows
+
+
+def model_folders():
+    try:
+        import folder_paths
+        return sorted(folder_paths.folder_names_and_paths)
+    except Exception:
+        return ["checkpoints", "clip", "clip_vision", "controlnet", "diffusion_models", "embeddings", "loras", "text_encoders", "unet", "upscale_models", "vae"]
+
+
+def safe_rel_path(value, max_len=240):
+    raw = str(value or "").strip()
+    if raw.startswith(("/", "\\")) or re.match(r"^[A-Za-z]:", raw):
+        raise LLMError("Use a path relative to the folder")
+    p = raw.replace("\\", "/").strip().strip("/")
+    parts = [x for x in p.split("/") if x not in ("", ".")]
+    if not parts or any(x == ".." for x in parts):
+        raise LLMError("Invalid file path")
+    rel = "/".join(parts)
+    if len(rel) > max_len:
+        raise LLMError("File path is too long")
+    for part in parts:
+        if not re.fullmatch(r"[\w .()+@-]+", part, re.UNICODE):
+            raise LLMError(f'Unsupported characters in "{part}"')
+        if part.startswith("-"):
+            raise LLMError("A file name cannot start with '-'")
+    return rel
+
+
+def hf_download_url(repo, file, revision="main"):
+    repo = str(repo or "").strip().strip("/")
+    if not re.fullmatch(r"[\w.-]+/[\w.-]+", repo):
+        raise LLMError("repo must be a Hugging Face id like owner/name")
+    rev = str(revision or "main").strip()
+    if not re.fullmatch(r"[\w./-]{1,120}", rev):
+        raise LLMError("Invalid revision")
+    rel = safe_rel_path(file)
+    return f"https://huggingface.co/{repo}/resolve/{rev}/{quote(rel, safe='/')}"
+
+
+def public_model_url(value):
+    parsed = urlparse(str(value or "").strip())
+    host = (parsed.hostname or "").lower()
+    if parsed.scheme != "https" or host not in HF_HOSTS:
+        raise LLMError("Only https://huggingface.co download URLs are supported")
+    if "/resolve/" not in parsed.path:
+        raise LLMError("Use a Hugging Face .../resolve/... file URL")
+    return parsed.geturl()
+
+
+async def download_to_file(url, dest, sha256=""):
+    tmp = dest + ".part"
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    have = os.path.getsize(tmp) if os.path.exists(tmp) else 0
+    headers = {"User-Agent": "ComfyUI-Agent"}
+    if have:
+        headers["Range"] = f"bytes={have}-"
+    timeout = aiohttp.ClientTimeout(total=None, sock_connect=30, sock_read=180)
+    try:
+        async with aiohttp.ClientSession(timeout=timeout, headers=headers) as session:
+            async with session.get(url, allow_redirects=True) as r:
+                append = have > 0 and r.status == 206
+                if r.status not in (200, 206):
+                    detail = (await r.text())[:300]
+                    raise LLMError(f"Hugging Face answered {r.status}. {detail}".strip())
+                length = int(r.headers.get("Content-Length") or 0)
+                free = shutil.disk_usage(os.path.dirname(dest)).free
+                if length and free < length + 512 * 1024 * 1024:
+                    raise LLMError(
+                        f"Not enough free disk space: need {length // 1024 ** 2} MB plus 512 MB, "
+                        f"free {free // 1024 ** 2} MB"
+                    )
+                done = have if append else 0
+                with open(tmp, "ab" if append else "wb") as f:
+                    async for chunk in r.content.iter_chunked(262144):
+                        f.write(chunk)
+                        done += len(chunk)
+    except Exception:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
+    expected = str(sha256 or "").strip().lower()
+    if expected:
+        h = hashlib.sha256()
+        with open(tmp, "rb") as f:
+            for chunk in iter(lambda: f.read(1024 * 1024), b""):
+                h.update(chunk)
+        actual = h.hexdigest()
+        if actual != expected:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+            raise LLMError(f"Checksum mismatch: expected {expected[:16]}…, got {actual[:16]}…")
+    os.replace(tmp, dest)
+    return done
+
+
+def normalize_github_repo(value):
+    s = str(value or "").strip()
+    s = re.sub(r"^https?://(?:www\.)?github\.com/", "", s, flags=re.I)
+    s = re.sub(r"^git@github\.com:", "", s, flags=re.I)
+    s = re.sub(r"\.git$", "", s.strip("/"), flags=re.I)
+    m = re.fullmatch(r"([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)", s)
+    if not m:
+        raise LLMError("Use a GitHub repository as owner/name or https://github.com/owner/name")
+    owner, repo = m.groups()
+    for part in (owner, repo):
+        if part.startswith(".") or part.startswith("-"):
+            raise LLMError("Invalid GitHub repository name")
+    return owner, repo
+
+
+def environment_report():
+    import platform
+    import sys
+
+    try:
+        import torch
+    except Exception:
+        torch = None
+    out = {
+        "python": sys.version.split()[0],
+        "platform": platform.platform(),
+        "machine": platform.machine(),
+        "cpu_count": os.cpu_count(),
+        "torch": getattr(torch, "__version__", None),
+        "cuda_available": bool(getattr(torch, "cuda", None) and torch.cuda.is_available()),
+        "cuda_version": getattr(getattr(torch, "version", None), "cuda", None),
+        "cudnn": getattr(getattr(getattr(torch, "backends", None), "cudnn", None), "version", lambda: None)(),
+        "devices": [],
+    }
+    try:
+        total, _, free = shutil.disk_usage(ROOT)
+        out["disk"] = {"root": ROOT, "total_gb": round(total / 1e9, 1), "free_gb": round(free / 1e9, 1)}
+    except OSError:
+        pass
+    if out["cuda_available"]:
+        for i in range(torch.cuda.device_count()):
+            try:
+                p = torch.cuda.get_device_properties(i)
+                out["devices"].append({
+                    "index": i,
+                    "name": p.name,
+                    "vram_gb": round(p.total_memory / 1e9, 1),
+                    "compute": f"{p.major}.{p.minor}",
+                })
+            except Exception:
+                pass
+    try:
+        import comfyui_version
+        out["comfyui"] = getattr(comfyui_version, "__version__", None)
+    except Exception:
+        pass
+    try:
+        from importlib import metadata
+        for pkg in ("torch", "torchvision", "torchaudio", "transformers", "safetensors", "numpy"):
+            try:
+                out.setdefault("packages", {})[pkg] = metadata.version(pkg)
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return out
+
+
+def model_file_info(folder, rel):
+    import folder_paths
+
+    folders = model_folders()
+    if folder not in folders:
+        raise LLMError(f'Unknown models folder "{folder}". Use one of: {", ".join(folders[:24])}')
+    roots = folder_paths.get_folder_paths(folder)
+    if not roots:
+        raise LLMError(f"No models folder is configured for {folder}")
+    root = os.path.realpath(roots[0])
+    name = safe_rel_path(rel)
+    path = os.path.realpath(os.path.join(root, name))
+    if not path.startswith(root + os.sep) or not os.path.isfile(path):
+        raise LLMError("Model file not found")
+    st = os.stat(path)
+    out = {
+        "folder": folder, "path": name, "file": os.path.basename(name),
+        "size": st.st_size, "modified": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(st.st_mtime)),
+    }
+    if name.lower().endswith(".safetensors"):
+        try:
+            with open(path, "rb") as f:
+                n = int.from_bytes(f.read(8), "little")
+                if 0 < n <= 100 * 1024 * 1024:
+                    header = json.loads(f.read(n))
+                    tensors = {k: v for k, v in header.items() if k != "__metadata__"}
+                    dtypes = {}
+                    params = 0
+                    for meta in tensors.values():
+                        shape = meta.get("shape") or []
+                        count = 1
+                        for dim in shape:
+                            count *= int(dim)
+                        params += count
+                        key = str(meta.get("dtype") or "?")
+                        dtypes[key] = dtypes.get(key, 0) + 1
+                    out["safetensors"] = {
+                        "tensors": len(tensors),
+                        "parameters": params,
+                        "dtypes": dtypes,
+                        "metadata": {k: str(v)[:200] for k, v in (header.get("__metadata__") or {}).items()},
+                    }
+        except Exception as e:
+            out["safetensors_error"] = str(e)[:200]
+    return out
+
+
+def custom_nodes_list():
+    rows = []
+    for base in custom_nodes_dirs():
+        try:
+            names = sorted(os.listdir(base))
+        except OSError:
+            continue
+        for raw in names:
+            if raw.startswith(".") or raw == "__pycache__":
+                continue
+            full = os.path.join(base, raw)
+            if not os.path.isdir(full):
+                continue
+            disabled = raw.endswith(".disabled")
+            name = raw[:-9] if disabled else raw
+            if name.startswith("ComfyUI-Agent"):
+                continue
+            try:
+                files = len(os.listdir(full))
+            except OSError:
+                files = 0
+            rows.append({
+                "name": name,
+                "folder": raw,
+                "path": full,
+                "disabled": disabled,
+                "files": files,
+                "requirements": os.path.exists(os.path.join(full, "requirements.txt")),
+                "install_script": os.path.exists(os.path.join(full, "install.py")),
+                "git": os.path.isdir(os.path.join(full, ".git")),
+            })
+        if rows:
+            break
+    return rows
+
+
+def toggle_custom_node(name, enabled):
+    raw_name = str(name or "").strip()
+    if not re.fullmatch(r"[\w .()-]{1,120}", raw_name):
+        raise LLMError("Invalid pack name")
+    base = None
+    for d in custom_nodes_dirs():
+        target = os.path.join(d, raw_name)
+        disabled = os.path.join(d, raw_name + ".disabled")
+        if os.path.isdir(target) or os.path.isdir(disabled):
+            base = d
+            break
+    if not base:
+        raise LLMError(f'Custom node pack "{raw_name}" was not found')
+    src = os.path.join(base, raw_name + ".disabled" if enabled else raw_name)
+    dst = os.path.join(base, raw_name if enabled else raw_name + ".disabled")
+    if not os.path.isdir(src):
+        return {"ok": True, "name": raw_name, "enabled": not enabled, "note": "Already in the requested state."}
+    if os.path.exists(dst):
+        raise LLMError(f'Cannot rename: "{os.path.basename(dst)}" already exists')
+    os.rename(src, dst)
+    return {"ok": True, "name": raw_name, "enabled": bool(enabled), "path": dst, "restart_required": True}
+
+
+
 async def run_search(cfg, query):
     provider = cfg.get("search_provider", "off")
     key = cfg.get("search_key", "")
@@ -1210,6 +1689,202 @@ def setup_routes():
         if not path:
             return err("Pack folder not found in custom_nodes", 404)
         return web.json_response(pack_docs(path))
+
+    @routes.get("/crazy_agent/knowledge")
+    async def get_knowledge(request):
+        query = str(request.query.get("q") or "").strip()[:300]
+        if not query:
+            docs = {}
+            for d in knowledge_docs():
+                entry = docs.setdefault(d["file"], {"title": d["doc"], "tags": d["tags"], "sections": []})
+                entry["sections"].append(d["section"])
+            return web.json_response({"docs": [{"file": k, **v} for k, v in docs.items()]})
+        limit = request.query.get("limit") or 3
+        try:
+            limit = min(max(int(limit), 1), 6)
+        except ValueError:
+            limit = 3
+        return web.json_response({"query": query, "results": knowledge_search(query, limit)})
+
+    @routes.get("/crazy_agent/assets")
+    async def get_assets(request):
+        query = str(request.query.get("q") or "").strip()[:300]
+        kind = str(request.query.get("kind") or "").strip().lower()
+        folder = str(request.query.get("folder") or "").strip()
+        try:
+            limit = min(max(int(request.query.get("limit") or 50), 1), 200)
+        except ValueError:
+            limit = 50
+        rows = await asyncio.to_thread(scan_assets)
+        toks = re.findall(r"[\w.+-]{2,}", query.lower())[:8]
+        out = []
+        for row in rows:
+            if kind and row["kind"] != kind:
+                continue
+            if folder and row["folder"].lower() != folder.lower():
+                continue
+            hay = f'{row["name"]} {row["path"]} {row["folder"]}'.lower()
+            if toks and not all(tok in hay for tok in toks):
+                continue
+            out.append(row)
+        return web.json_response({"total": len(out), "returned": min(len(out), limit), "items": out[:limit]})
+
+    @routes.get("/crazy_agent/environment")
+    async def get_environment(request):
+        try:
+            return web.json_response(await asyncio.to_thread(environment_report))
+        except Exception as e:
+            return err(str(e) or "Cannot read the environment", 500)
+
+    @routes.get("/crazy_agent/model_info")
+    async def get_model_info(request):
+        try:
+            info = await asyncio.to_thread(
+                model_file_info,
+                request.query.get("folder", ""),
+                request.query.get("path", "") or request.query.get("file", ""),
+            )
+            return web.json_response(info)
+        except LLMError as e:
+            return err(str(e), 404)
+        except Exception as e:
+            return err(str(e) or "Cannot read the model file", 500)
+
+    @routes.get("/crazy_agent/custom_nodes")
+    async def get_custom_nodes(request):
+        try:
+            rows = await asyncio.to_thread(custom_nodes_list)
+            return web.json_response({"total": len(rows), "items": rows})
+        except Exception as e:
+            return err(str(e) or "Cannot read custom_nodes", 500)
+
+    @routes.post("/crazy_agent/custom_node_toggle")
+    async def custom_node_toggle(request):
+        if not _update_allowed(request):
+            return err("Changing node packs is allowed only from this computer.", 403)
+        try:
+            body = await request.json()
+        except Exception:
+            return err("Bad JSON")
+        try:
+            r = await asyncio.to_thread(toggle_custom_node, body.get("name"), body.get("enabled") is not False)
+            return web.json_response(r)
+        except LLMError as e:
+            return err(str(e))
+        except OSError as e:
+            return err(f"Cannot rename the pack folder: {e}", 500)
+
+    @routes.post("/crazy_agent/download_model")
+    async def download_model(request):
+        if not _update_allowed(request):
+            return err("Downloads are allowed only from this computer.", 403)
+        try:
+            body = await request.json()
+        except Exception:
+            return err("Bad JSON")
+        folder = str(body.get("folder") or "").strip()
+        folders = model_folders()
+        if folder not in folders:
+            return err(f'Unknown models folder "{folder}". Use one of: {", ".join(folders[:24])}')
+        try:
+            if body.get("url"):
+                url = public_model_url(body["url"])
+                filename = safe_rel_path(body.get("path") or unquote(os.path.basename(urlparse(url).path)))
+            else:
+                filename = safe_rel_path(body.get("path") or body.get("file"))
+                url = hf_download_url(body.get("repo"), body.get("file"), body.get("revision") or "main")
+            if asset_kind(filename) != "model":
+                raise LLMError("The destination must be a model file (.safetensors, .ckpt, .pt, .pth, .bin, .gguf, .sft, .onnx)")
+            import folder_paths
+            roots = folder_paths.get_folder_paths(folder)
+        except LLMError as e:
+            return err(str(e))
+        except Exception as e:
+            return err(str(e) or "Cannot resolve the models folder")
+        if not roots:
+            return err(f"No models folder is configured for {folder}")
+        root = os.path.realpath(roots[0])
+        dest = os.path.realpath(os.path.join(root, filename))
+        if not dest.startswith(root + os.sep):
+            return err("Invalid destination")
+        if os.path.exists(dest) and body.get("overwrite") is not True:
+            return web.json_response({"exists": True, "folder": folder, "path": filename, "size": os.path.getsize(dest)})
+        checksum = str(body.get("sha256") or "").strip().lower()
+        if checksum and not re.fullmatch(r"[0-9a-f]{64}", checksum):
+            return err("sha256 must be 64 hexadecimal characters")
+        try:
+            async with DOWNLOAD_LOCK:
+                size = await download_to_file(url, dest, checksum)
+        except LLMError as e:
+            return err(str(e), 502)
+        except (aiohttp.ClientError, asyncio.TimeoutError, OSError) as e:
+            return err(f"Download failed: {e}", 502)
+        ASSET_CACHE.update(at=0.0, rows=[])
+        return web.json_response({"ok": True, "folder": folder, "path": filename, "size": size, "url": url, "sha256": checksum or None})
+
+    @routes.post("/crazy_agent/install_node")
+    async def install_node(request):
+        if not _update_allowed(request):
+            return err("Installing node packs is allowed only from this computer.", 403)
+        try:
+            body = await request.json()
+        except Exception:
+            return err("Bad JSON")
+        try:
+            owner, repo = normalize_github_repo(body.get("repo"))
+            name = safe_rel_path(body.get("folder") or repo)
+        except LLMError as e:
+            return err(str(e))
+        if "/" in name or len(name) > 80:
+            return err("Folder name must be a single path component")
+        dirs = custom_nodes_dirs()
+        if not dirs:
+            return err("custom_nodes folder was not found")
+        base = os.path.realpath(dirs[0])
+        target = os.path.realpath(os.path.join(base, name))
+        if not target.startswith(base + os.sep):
+            return err("Invalid destination")
+        if os.path.exists(target):
+            return err(f'"{name}" already exists in custom_nodes', 409)
+        cmd = ["git", "clone", "--depth", "1", "--single-branch"]
+        branch = str(body.get("branch") or "").strip()
+        if branch:
+            if not re.fullmatch(r"[\w./-]{1,120}", branch):
+                return err("Invalid branch name")
+            cmd += ["--branch", branch]
+        cmd += ["--", f"https://github.com/{owner}/{repo}.git", target]
+
+        def clone():
+            env = dict(os.environ, GIT_TERMINAL_PROMPT="0")
+            return subprocess.run(
+                cmd, capture_output=True, text=True, timeout=300,
+                encoding="utf-8", errors="replace", env=env,
+            )
+
+        try:
+            proc = await asyncio.to_thread(clone)
+        except FileNotFoundError:
+            return err("git is not installed", 500)
+        except subprocess.TimeoutExpired:
+            shutil.rmtree(target, ignore_errors=True)
+            return err("git clone timed out", 504)
+        if proc.returncode != 0:
+            shutil.rmtree(target, ignore_errors=True)
+            return err((proc.stderr or proc.stdout or "git clone failed")[:500], 502)
+        try:
+            entries = [x for x in os.listdir(target) if x != ".git"][:40]
+        except OSError:
+            entries = []
+        req = next((x for x in ("requirements.txt", "pyproject.toml", "install.py") if os.path.exists(os.path.join(target, x))), "")
+        return web.json_response({
+            "ok": True,
+            "pack": name,
+            "repo": f"{owner}/{repo}",
+            "path": name,
+            "files": entries,
+            "requirements": req,
+            "restart_required": True,
+        })
 
     @routes.post("/crazy_agent/suggest")
     async def suggest(request):
