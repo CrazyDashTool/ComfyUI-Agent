@@ -12,6 +12,11 @@ const TAB_ID = "crazy-agent";
 const LS_LANG = "crazy_agent.lang.v1";
 const LS_VERSIONS = "crazy_agent.versions.v1";
 const LS_MEMORY = "crazy_agent.memory.v1";
+const LS_THEME = "crazy_agent.theme.v1";
+const LS_DARK = "crazy_agent.dark.v1";
+const THEMES = ["comfy", "claude", "lux", "colors"];
+const THEME_KEYS = { comfy: "themeComfy", claude: "themeClaude", lux: "themeLux", colors: "themeColors" };
+const SETTINGS_TABS = [["ai", "tabAI"], ["custom", "tabCustom"], ["logs", "tabLogs"]];
 const SNAP_LIMIT = 600000;
 const VERSION_LIMIT = 20;
 
@@ -73,6 +78,10 @@ const EN = {
   retryExhausted: "The model returned an empty reply after several attempts. Try again or choose another model.", loopGuard: "The agent repeated the same action and stopped. Ask it to continue with a different approach.",
   logs: "Server log", getLogs: "Show recent logs", noLogs: "No log lines yet.",
   attSkipped: "Skipped {n} file(s): too large or unsupported.",
+  attInInput: "In the input folder",
+  attUploadFailed: "Upload failed",
+  attToCanvas: "Add a loader node with this file",
+  attAdded: "Added {name} to node #{node}",
   diffTitle: "Workflow comparison", diffSummary: "{from} → {to}: +{add} / −{del} nodes, ~{mod} changed, {links}",
   diffApply: "Apply selected", diffDone: "Applied", diffNone: "Select at least one change.", diffApplied: "Applied {n} change(s) to the canvas.",
   subgraphEdited: "Subgraph \"{name}\" updated ({n} change(s)).", subgraphCreated: "Created subgraph \"{name}\" from {n} node(s).",
@@ -98,6 +107,7 @@ const EN = {
   updateNoGit: "Updates work only in a git checkout.", updateFailed: "Update failed: {err}",
   updateRestart: "Restart ComfyUI and reload the page.",
   ctxCompressed: "Earlier steps were compressed; goals, decisions and the roadmap are kept.",
+  ctxRescued: "The model returned an empty answer, so earlier images were dropped and the request was retried.",
   planMode: "Plan mode", planTitle: "Plan", planApprove: "Approve", planCancel: "Cancel", planRevise: "Request changes",
   planFeedback: "Optional: what to change", planStateApproved: "Approved", planStateRevised: "Changes requested", planStateCancelled: "Cancelled",
   roadmapTitle: "Roadmap", roadmapActive: "In progress", roadmapDone: "Completed", roadmapFailed: "Needs attention",
@@ -105,6 +115,46 @@ const EN = {
   planMsgApproved: "The user approved the plan. Execute it now, step by step.",
   planMsgRevised: "The user wants the plan changed: \"{text}\". Call propose_plan again with the revised plan.",
   planMsgCancelled: "The user rejected the plan. Make no changes. Ask what they want instead.",
+  planPreflight: "Pre-flight: node availability",
+  pfStateOk: "ready", pfStateDisabled: "pack off", pfStateBroken: "import error", pfStateMissing: "not installed", pfStateUnknown: "unknown",
+  pfNoteOk: "loaded and ready to use", pfNoteOkPack: "loaded from {pack}",
+  pfNoteDisabled: "the pack {pack} is disabled: enable it and restart ComfyUI",
+  pfNoteBroken: "the pack {pack} is installed but this node is not registered: check the server log or use another node",
+  pfNoteMissing: "the pack {repo} is not installed: install it and restart ComfyUI",
+  pfNoteUnknown: "no node with this name exists: replace it with an installed node",
+  pfNoteAlt: "installed alternatives: {list}",
+  pfSummary: "ready: {ok} · need setup: {fix} · unknown: {bad}",
+  pfStepInstall: "Install the pack {repo} for {type}",
+  pfStepEnable: "Enable the disabled pack {pack} for {type}",
+  pfStepFix: "Check the pack {pack}: the node {type} is not registered (server log, requirements)",
+  pfStepRestart: "Restart ComfyUI so the new nodes load",
+  planPhaseSetup: "Phase 1 · Install and restart",
+  planPhaseBuild: "Phase 2 · Build the graph",
+  planMsgApprovedSetup: "The pre-flight found node types that are not ready yet: {list}. Do the setup phase first and ask the user to restart ComfyUI. New nodes load only after the restart, so build the graph after the user comes back.",
+  planMsgApprovedUnknown: "The pre-flight found node types that do not exist: {list}. Replace them with one of the installed alternatives before building the graph.",
+  theme: "Theme", themeSub: "Pick a look. The switch sets the light or dark version.",
+  themeComfy: "ComfyUI", themeClaude: "Claude", themeLux: "Luxurious", themeColors: "Colors",
+  themeDark: "Dark mode", themeDarkSub: "Light or dark version of the selected theme.",
+  themeDarkComfy: "The ComfyUI theme follows ComfyUI's own colors.",
+  tabAI: "AI", tabCustom: "Customization", tabLogs: "Logs",
+  agentName: "Agent name", agentNamePlaceholder: "Comfy Agent",
+  agentNameSub: "What the assistant calls itself in its replies.",
+  userName: "Your name", userNamePlaceholder: "Your name",
+  userNameSub: "How the assistant should address you.",
+  editImage: "Edit image", edTitle: "Edit image",
+  edDraw: "Draw", edCrop: "Crop", edText: "Text", edTextPlaceholder: "Text to add",
+  edTextHint: "Type the text, then click where it should go.",
+  edCropHint: "Drag over the image to select the crop area.",
+  edDrawHint: "Drag on the image to draw.",
+  edSize: "Size", edColor: "Color", edRedo: "Redo", edRotateLeft: "Rotate left", edRotateRight: "Rotate right",
+  edReset: "Reset", edApply: "Apply", edCropApply: "Crop selection",
+  edCropEmpty: "Select a crop area on the image first.",
+  edTextEmpty: "Type the text to add first.",
+  edApplied: "Image updated",
+  compatTitle: "Compatibility", compatSub: "Check the ComfyUI version and the frontend APIs this panel needs.",
+  compatRun: "Check compatibility", compatOk: "Compatible", compatIssues: "{n} issue(s) found",
+  compatUnknown: "unknown", compatBackend: "Backend", compatFrontend: "ComfyUI frontend",
+  compatFailed: "Check failed: {err}", compatRestart: "Restart ComfyUI once so the new backend routes load.",
   actionsTitle: "Quick actions", actionApplied: "Applied to the canvas.", actionOpened: "Opened node #{id} {name}.",
   actionNoNode: "Node #{id} is not on the canvas.", actionNoError: "No error in this chat.",
 };
@@ -167,6 +217,10 @@ const RU_STR = {
   retryExhausted: "Модель вернула пустой ответ после нескольких попыток. Попробуй ещё раз или выбери другую модель.", loopGuard: "Агент повторил одно и то же действие и остановился. Попроси продолжить другим способом.",
   logs: "Лог сервера", getLogs: "Показать последние строки", noLogs: "Строк лога пока нет.",
   attSkipped: "Пропущено файлов: {n} — слишком большие или неподдерживаемые.",
+  attInInput: "В папке input",
+  attUploadFailed: "Не загружено",
+  attToCanvas: "Добавить нод с этим файлом",
+  attAdded: "{name} добавлен в нод #{node}",
   diffTitle: "Сравнение workflow", diffSummary: "{from} → {to}: +{add} / −{del} нод, ~{mod} изменено, {links}",
   diffApply: "Применить выбранное", diffDone: "Применено", diffNone: "Выбери хотя бы одно изменение.", diffApplied: "Применено изменений: {n}.",
   subgraphEdited: "Подграф «{name}» обновлён (изменений: {n}).", subgraphCreated: "Создан подграф «{name}» из нод: {n}.",
@@ -192,6 +246,7 @@ const RU_STR = {
   updateNoGit: "Автообновление работает только для git-копии.", updateFailed: "Не удалось обновить: {err}",
   updateRestart: "Перезапусти ComfyUI и обнови страницу.",
   ctxCompressed: "Ранние шаги сжаты; цели, решения и роадмап сохранены.",
+  ctxRescued: "Модель вернула пустой ответ, поэтому ранние изображения убраны и запрос повторён.",
   planMode: "Режим планирования", planTitle: "План", planApprove: "Подтвердить", planCancel: "Отмена", planRevise: "Запросить изменения",
   planFeedback: "Необязательно: что поменять", planStateApproved: "Подтверждён", planStateRevised: "Запрошены изменения", planStateCancelled: "Отменён",
   roadmapTitle: "Маршрут", roadmapActive: "В процессе", roadmapDone: "Завершён", roadmapFailed: "Требует внимания",
@@ -199,6 +254,46 @@ const RU_STR = {
   planMsgApproved: "Пользователь подтвердил план. Выполняй его по шагам.",
   planMsgRevised: "Пользователь хочет изменить план: «{text}». Вызови propose_plan снова с исправленным планом.",
   planMsgCancelled: "Пользователь отклонил план. Ничего не меняй и спроси, что он хочет.",
+  planPreflight: "Предполёт: доступность нод",
+  pfStateOk: "готова", pfStateDisabled: "пакет выключен", pfStateBroken: "ошибка импорта", pfStateMissing: "не установлена", pfStateUnknown: "неизвестна",
+  pfNoteOk: "загружена и готова к работе", pfNoteOkPack: "загружена из {pack}",
+  pfNoteDisabled: "пакет {pack} выключен: включи его и перезапусти ComfyUI",
+  pfNoteBroken: "пакет {pack} установлен, но эта нода не зарегистрирована: посмотри лог сервера или возьми другую ноду",
+  pfNoteMissing: "пакет {repo} не установлен: установи его и перезапусти ComfyUI",
+  pfNoteUnknown: "ноды с таким именем нет: замени её на установленную",
+  pfNoteAlt: "установленные альтернативы: {list}",
+  pfSummary: "готово: {ok} · к установке: {fix} · неизвестно: {bad}",
+  pfStepInstall: "Установить пакет {repo} для {type}",
+  pfStepEnable: "Включить выключенный пакет {pack} для {type}",
+  pfStepFix: "Проверить пакет {pack}: нода {type} не зарегистрирована (лог сервера, зависимости)",
+  pfStepRestart: "Перезапустить ComfyUI, чтобы новые ноды загрузились",
+  planPhaseSetup: "Фаза 1 · Установка и перезапуск",
+  planPhaseBuild: "Фаза 2 · Сборка графа",
+  planMsgApprovedSetup: "Предполёт нашёл ноды, которые пока не готовы: {list}. Сначала сделай фазу установки и попроси пользователя перезапустить ComfyUI. Новые ноды загружаются только после перезапуска, поэтому собирай граф после того, как пользователь вернётся.",
+  planMsgApprovedUnknown: "Предполёт нашёл ноды, которых не существует: {list}. Замени их одной из установленных альтернатив перед сборкой графа.",
+  theme: "Тема", themeSub: "Выберите оформление. Переключатель задаёт светлую или тёмную версию.",
+  themeComfy: "ComfyUI", themeClaude: "Claude", themeLux: "Люкс", themeColors: "Цвета",
+  themeDark: "Тёмная тема", themeDarkSub: "Светлая или тёмная версия выбранной темы.",
+  themeDarkComfy: "Тема ComfyUI берёт цвета из самого ComfyUI.",
+  tabAI: "AI", tabCustom: "Оформление", tabLogs: "Логи",
+  agentName: "Имя агента", agentNamePlaceholder: "Comfy Agent",
+  agentNameSub: "Как ассистент называет себя в ответах.",
+  userName: "Ваше имя", userNamePlaceholder: "Ваше имя",
+  userNameSub: "Как ассистент должен к вам обращаться.",
+  editImage: "Редактировать фото", edTitle: "Редактирование фото",
+  edDraw: "Кисть", edCrop: "Обрезать", edText: "Текст", edTextPlaceholder: "Текст для добавления",
+  edTextHint: "Введите текст и нажмите на фото, чтобы разместить его.",
+  edCropHint: "Выделите область обрезки на фото.",
+  edDrawHint: "Проведите по фото, чтобы рисовать.",
+  edSize: "Размер", edColor: "Цвет", edRedo: "Повторить", edRotateLeft: "Повернуть влево", edRotateRight: "Повернуть вправо",
+  edReset: "Сбросить", edApply: "Применить", edCropApply: "Обрезать выделенное",
+  edCropEmpty: "Сначала выделите область обрезки.",
+  edTextEmpty: "Сначала введите текст.",
+  edApplied: "Фото обновлено",
+  compatTitle: "Совместимость", compatSub: "Проверка версии ComfyUI и API интерфейса, которые нужны панели.",
+  compatRun: "Проверить совместимость", compatOk: "Совместимо", compatIssues: "Найдено проблем: {n}",
+  compatUnknown: "неизвестно", compatBackend: "Бэкенд", compatFrontend: "Интерфейс ComfyUI",
+  compatFailed: "Не удалось проверить: {err}", compatRestart: "Перезапустите ComfyUI один раз, чтобы загрузились новые маршруты.",
   actionsTitle: "Быстрые действия", actionApplied: "Применено на холст.", actionOpened: "Открыта нода #{id} {name}.",
   actionNoNode: "Ноды #{id} нет на холсте.", actionNoError: "В этом чате нет ошибок.",
 };
@@ -261,6 +356,10 @@ const DE_STR = {
   retryExhausted: "Das Modell hat nach mehreren Versuchen eine leere Antwort geliefert. Versuche es erneut oder wähle ein anderes Modell.", loopGuard: "Der Agent hat dieselbe Aktion wiederholt und gestoppt. Bitte um einen anderen Ansatz.",
   logs: "Server-Protokoll", getLogs: "Letzte Zeilen anzeigen", noLogs: "Noch keine Protokollzeilen.",
   attSkipped: "{n} Datei(en) übersprungen: zu groß oder nicht unterstützt.",
+  attInInput: "Im input-Ordner",
+  attUploadFailed: "Upload fehlgeschlagen",
+  attToCanvas: "Loader-Knoten mit dieser Datei anlegen",
+  attAdded: "{name} in Knoten #{node} gesetzt",
   diffTitle: "Workflow-Vergleich", diffSummary: "{from} → {to}: +{add} / −{del} Nodes, ~{mod} geändert, {links}",
   diffApply: "Auswahl anwenden", diffDone: "Angewendet", diffNone: "Wähle mindestens eine Änderung.", diffApplied: "{n} Änderung(en) auf die Arbeitsfläche angewendet.",
   subgraphEdited: "Subgraph \"{name}\" aktualisiert ({n} Änderung(en)).", subgraphCreated: "Subgraph \"{name}\" aus {n} Node(s) erstellt.",
@@ -286,6 +385,7 @@ const DE_STR = {
   updateNoGit: "Updates nur für eine Git-Kopie.", updateFailed: "Update fehlgeschlagen: {err}",
   updateRestart: "ComfyUI neu starten und die Seite neu laden.",
   ctxCompressed: "Frühere Schritte wurden komprimiert; Ziele, Entscheidungen und Roadmap bleiben erhalten.",
+  ctxRescued: "Das Modell lieferte eine leere Antwort, daher wurden frühere Bilder entfernt und die Anfrage erneut gesendet.",
   planMode: "Planungsmodus", planTitle: "Plan", planApprove: "Bestätigen", planCancel: "Abbrechen", planRevise: "Änderungen anfordern",
   planFeedback: "Optional: was ändern", planStateApproved: "Bestätigt", planStateRevised: "Änderungen angefordert", planStateCancelled: "Abgebrochen",
   roadmapTitle: "Roadmap", roadmapActive: "In Arbeit", roadmapDone: "Abgeschlossen", roadmapFailed: "Braucht Aufmerksamkeit",
@@ -293,6 +393,46 @@ const DE_STR = {
   planMsgApproved: "Der Nutzer hat den Plan bestätigt. Führe ihn jetzt Schritt für Schritt aus.",
   planMsgRevised: "Der Nutzer möchte den Plan ändern: \"{text}\". Rufe propose_plan erneut mit dem überarbeiteten Plan auf.",
   planMsgCancelled: "Der Nutzer hat den Plan abgelehnt. Nimm keine Änderungen vor und frag, was er möchte.",
+  planPreflight: "Vorab-Check: Knoten verfügbar",
+  pfStateOk: "bereit", pfStateDisabled: "Paket aus", pfStateBroken: "Importfehler", pfStateMissing: "nicht installiert", pfStateUnknown: "unbekannt",
+  pfNoteOk: "geladen und einsatzbereit", pfNoteOkPack: "geladen aus {pack}",
+  pfNoteDisabled: "Das Paket {pack} ist deaktiviert: aktiviere es und starte ComfyUI neu",
+  pfNoteBroken: "Das Paket {pack} ist installiert, aber dieser Knoten ist nicht registriert: prüfe das Server-Log oder nimm einen anderen Knoten",
+  pfNoteMissing: "Das Paket {repo} ist nicht installiert: installiere es und starte ComfyUI neu",
+  pfNoteUnknown: "Es gibt keinen Knoten mit diesem Namen: ersetze ihn durch einen installierten",
+  pfNoteAlt: "installierte Alternativen: {list}",
+  pfSummary: "bereit: {ok} · brauchen Setup: {fix} · unbekannt: {bad}",
+  pfStepInstall: "Paket {repo} für {type} installieren",
+  pfStepEnable: "Deaktiviertes Paket {pack} für {type} aktivieren",
+  pfStepFix: "Paket {pack} prüfen: der Knoten {type} ist nicht registriert (Server-Log, Abhängigkeiten)",
+  pfStepRestart: "ComfyUI neu starten, damit die neuen Knoten geladen werden",
+  planPhaseSetup: "Phase 1 · Installieren und neu starten",
+  planPhaseBuild: "Phase 2 · Graph bauen",
+  planMsgApprovedSetup: "Der Vorab-Check hat Knoten gefunden, die noch nicht bereit sind: {list}. Mach zuerst die Setup-Phase und bitte den Nutzer, ComfyUI neu zu starten. Neue Knoten laden erst nach dem Neustart, baue den Graph also erst, wenn der Nutzer zurück ist.",
+  planMsgApprovedUnknown: "Der Vorab-Check hat Knoten gefunden, die es nicht gibt: {list}. Ersetze sie vor dem Graph-Aufbau durch eine der installierten Alternativen.",
+  theme: "Design", themeSub: "Wähle ein Design. Der Schalter legt die helle oder dunkle Variante fest.",
+  themeComfy: "ComfyUI", themeClaude: "Claude", themeLux: "Luxus", themeColors: "Colors",
+  themeDark: "Dunkelmodus", themeDarkSub: "Helle oder dunkle Variante des gewählten Designs.",
+  themeDarkComfy: "Das ComfyUI-Design übernimmt die Farben von ComfyUI.",
+  tabAI: "KI", tabCustom: "Anpassung", tabLogs: "Protokolle",
+  agentName: "Name des Agenten", agentNamePlaceholder: "Comfy Agent",
+  agentNameSub: "Wie der Assistent sich in seinen Antworten nennt.",
+  userName: "Dein Name", userNamePlaceholder: "Dein Name",
+  userNameSub: "Wie der Assistent dich ansprechen soll.",
+  editImage: "Bild bearbeiten", edTitle: "Bild bearbeiten",
+  edDraw: "Stift", edCrop: "Zuschneiden", edText: "Text", edTextPlaceholder: "Text zum Hinzufügen",
+  edTextHint: "Text eingeben und dann auf das Bild klicken.",
+  edCropHint: "Ziehe einen Rahmen für den Zuschnitt auf.",
+  edDrawHint: "Ziehe über das Bild, um zu zeichnen.",
+  edSize: "Größe", edColor: "Farbe", edRedo: "Wiederholen", edRotateLeft: "Nach links drehen", edRotateRight: "Nach rechts drehen",
+  edReset: "Zurücksetzen", edApply: "Übernehmen", edCropApply: "Auswahl zuschneiden",
+  edCropEmpty: "Wähle zuerst einen Zuschnittbereich.",
+  edTextEmpty: "Gib zuerst einen Text ein.",
+  edApplied: "Bild aktualisiert",
+  compatTitle: "Kompatibilität", compatSub: "Prüft die ComfyUI-Version und die Frontend-APIs, die das Panel braucht.",
+  compatRun: "Kompatibilität prüfen", compatOk: "Kompatibel", compatIssues: "{n} Problem(e) gefunden",
+  compatUnknown: "unbekannt", compatBackend: "Backend", compatFrontend: "ComfyUI-Frontend",
+  compatFailed: "Prüfung fehlgeschlagen: {err}", compatRestart: "ComfyUI einmal neu starten, damit die neuen Backend-Routen laden.",
   actionsTitle: "Schnellaktionen", actionApplied: "Auf die Arbeitsfläche angewendet.", actionOpened: "Node #{id} {name} geöffnet.",
   actionNoNode: "Node #{id} ist nicht auf der Arbeitsfläche.", actionNoError: "Kein Fehler in diesem Chat.",
 };
@@ -355,6 +495,10 @@ const PL_STR = {
   retryExhausted: "Model zwrócił pustą odpowiedź po kilku próbach. Spróbuj ponownie lub wybierz inny model.", loopGuard: "Agent powtórzył tę samą akcję i zatrzymał się. Poproś o inne podejście.",
   logs: "Log serwera", getLogs: "Pokaż ostatnie linie", noLogs: "Brak linii logu.",
   attSkipped: "Pominięto pliki: {n} — zbyt duże lub nieobsługiwane.",
+  attInInput: "W folderze input",
+  attUploadFailed: "Nie przesłano",
+  attToCanvas: "Dodaj węzeł z tym plikiem",
+  attAdded: "Dodano {name} do węzła #{node}",
   diffTitle: "Porównanie workflow", diffSummary: "{from} → {to}: +{add} / −{del} węzłów, ~{mod} zmienionych, {links}",
   diffApply: "Zastosuj wybrane", diffDone: "Zastosowano", diffNone: "Wybierz co najmniej jedną zmianę.", diffApplied: "Zastosowano zmiany: {n}.",
   subgraphEdited: "Podgraf \"{name}\" zaktualizowany (zmian: {n}).", subgraphCreated: "Utworzono podgraf \"{name}\" z węzłów: {n}.",
@@ -380,6 +524,7 @@ const PL_STR = {
   updateNoGit: "Aktualizacja tylko dla kopii git.", updateFailed: "Aktualizacja nie powiodła się: {err}",
   updateRestart: "Uruchom ponownie ComfyUI i odśwież stronę.",
   ctxCompressed: "Wcześniejsze kroki zostały skompresowane; cele, decyzje i roadmapa pozostają.",
+  ctxRescued: "Model zwrócił pustą odpowiedź, więc wcześniejsze obrazy usunięto i zapytanie ponowiono.",
   planMode: "Tryb planowania", planTitle: "Plan", planApprove: "Zatwierdź", planCancel: "Anuluj", planRevise: "Poproś o zmiany",
   planFeedback: "Opcjonalnie: co zmienić", planStateApproved: "Zatwierdzony", planStateRevised: "Poproszono o zmiany", planStateCancelled: "Anulowany",
   roadmapTitle: "Plan działania", roadmapActive: "W trakcie", roadmapDone: "Ukończony", roadmapFailed: "Wymaga uwagi",
@@ -387,6 +532,46 @@ const PL_STR = {
   planMsgApproved: "Użytkownik zatwierdził plan. Wykonaj go krok po kroku.",
   planMsgRevised: "Użytkownik chce zmienić plan: \"{text}\". Wywołaj propose_plan ponownie z poprawionym planem.",
   planMsgCancelled: "Użytkownik odrzucił plan. Nie wprowadzaj zmian i zapytaj, czego chce.",
+  planPreflight: "Wstępna kontrola: dostępność węzłów",
+  pfStateOk: "gotowy", pfStateDisabled: "pakiet wyłączony", pfStateBroken: "błąd importu", pfStateMissing: "niezainstalowany", pfStateUnknown: "nieznany",
+  pfNoteOk: "wczytany i gotowy do pracy", pfNoteOkPack: "wczytany z {pack}",
+  pfNoteDisabled: "Pakiet {pack} jest wyłączony: włącz go i zrestartuj ComfyUI",
+  pfNoteBroken: "Pakiet {pack} jest zainstalowany, ale ten węzeł nie jest zarejestrowany: sprawdź log serwera lub użyj innego węzła",
+  pfNoteMissing: "Pakiet {repo} nie jest zainstalowany: zainstaluj go i zrestartuj ComfyUI",
+  pfNoteUnknown: "nie ma węzła o tej nazwie: zamień go na zainstalowany",
+  pfNoteAlt: "zainstalowane alternatywy: {list}",
+  pfSummary: "gotowe: {ok} · wymaga konfiguracji: {fix} · nieznane: {bad}",
+  pfStepInstall: "Zainstaluj pakiet {repo} dla {type}",
+  pfStepEnable: "Włącz wyłączony pakiet {pack} dla {type}",
+  pfStepFix: "Sprawdź pakiet {pack}: węzeł {type} nie jest zarejestrowany (log serwera, zależności)",
+  pfStepRestart: "Zrestartuj ComfyUI, aby nowe węzły się wczytały",
+  planPhaseSetup: "Faza 1 · Instalacja i restart",
+  planPhaseBuild: "Faza 2 · Budowa grafu",
+  planMsgApprovedSetup: "Wstępna kontrola znalazła węzły, które nie są jeszcze gotowe: {list}. Najpierw wykonaj fazę konfiguracji i poproś użytkownika o restart ComfyUI. Nowe węzły wczytują się dopiero po restarcie, więc buduj graf dopiero po powrocie użytkownika.",
+  planMsgApprovedUnknown: "Wstępna kontrola znalazła węzły, które nie istnieją: {list}. Zamień je na jedną z zainstalowanych alternatyw przed budową grafu.",
+  theme: "Motyw", themeSub: "Wybierz wygląd. Przełącznik ustawia jasny lub ciemny wariant.",
+  themeComfy: "ComfyUI", themeClaude: "Claude", themeLux: "Luksus", themeColors: "Kolory",
+  themeDark: "Tryb ciemny", themeDarkSub: "Jasny lub ciemny wariant wybranego motywu.",
+  themeDarkComfy: "Motyw ComfyUI używa kolorów ComfyUI.",
+  tabAI: "AI", tabCustom: "Personalizacja", tabLogs: "Logi",
+  agentName: "Nazwa agenta", agentNamePlaceholder: "Comfy Agent",
+  agentNameSub: "Jak asystent nazywa siebie w odpowiedziach.",
+  userName: "Twoje imię", userNamePlaceholder: "Twoje imię",
+  userNameSub: "Jak asystent ma się do ciebie zwracać.",
+  editImage: "Edytuj obraz", edTitle: "Edytuj obraz",
+  edDraw: "Pędzel", edCrop: "Przytnij", edText: "Tekst", edTextPlaceholder: "Tekst do dodania",
+  edTextHint: "Wpisz tekst, a potem kliknij miejsce na obrazie.",
+  edCropHint: "Zaznacz obszar przycięcia na obrazie.",
+  edDrawHint: "Przeciągnij po obrazie, aby rysować.",
+  edSize: "Rozmiar", edColor: "Kolor", edRedo: "Ponów", edRotateLeft: "Obróć w lewo", edRotateRight: "Obróć w prawo",
+  edReset: "Przywróć", edApply: "Zastosuj", edCropApply: "Przytnij zaznaczenie",
+  edCropEmpty: "Najpierw zaznacz obszar przycięcia.",
+  edTextEmpty: "Najpierw wpisz tekst.",
+  edApplied: "Obraz zaktualizowany",
+  compatTitle: "Zgodność", compatSub: "Sprawdza wersję ComfyUI i API interfejsu potrzebne przez panel.",
+  compatRun: "Sprawdź zgodność", compatOk: "Zgodne", compatIssues: "Znaleziono problemy: {n}",
+  compatUnknown: "nieznana", compatBackend: "Backend", compatFrontend: "Interfejs ComfyUI",
+  compatFailed: "Nie udało się sprawdzić: {err}", compatRestart: "Uruchom ComfyUI ponownie, aby wczytać nowe trasy backendu.",
   actionsTitle: "Szybkie akcje", actionApplied: "Zastosowano na kanwie.", actionOpened: "Otwarto węzeł #{id} {name}.",
   actionNoNode: "Węzła #{id} nie ma na kanwie.", actionNoError: "Brak błędu w tym czacie.",
 };
@@ -449,6 +634,10 @@ const FR_STR = {
   retryExhausted: "Le modèle a renvoyé une réponse vide après plusieurs tentatives. Réessaie ou choisis un autre modèle.", loopGuard: "L'agent a répété la même action et s'est arrêté. Demande une autre approche.",
   logs: "Journal du serveur", getLogs: "Afficher les dernières lignes", noLogs: "Aucune ligne de journal pour l'instant.",
   attSkipped: "{n} fichier(s) ignoré(s) : trop volumineux ou non pris en charge.",
+  attInInput: "Dans le dossier input",
+  attUploadFailed: "Échec de l’envoi",
+  attToCanvas: "Ajouter un nœud de chargement avec ce fichier",
+  attAdded: "{name} ajouté au nœud #{node}",
   diffTitle: "Comparaison de workflows", diffSummary: "{from} → {to} : +{add} / −{del} nœuds, ~{mod} modifiés, {links}",
   diffApply: "Appliquer la sélection", diffDone: "Appliqué", diffNone: "Sélectionne au moins une modification.", diffApplied: "{n} modification(s) appliquée(s) au canevas.",
   subgraphEdited: "Sous-graphe « {name} » mis à jour ({n} modification(s)).", subgraphCreated: "Sous-graphe « {name} » créé à partir de {n} nœud(s).",
@@ -474,6 +663,7 @@ const FR_STR = {
   updateNoGit: "Mise à jour réservée à une copie git.", updateFailed: "Échec de la mise à jour : {err}",
   updateRestart: "Redémarre ComfyUI et recharge la page.",
   ctxCompressed: "Les étapes précédentes ont été compressées ; objectifs, décisions et feuille de route sont conservés.",
+  ctxRescued: "Le modèle a renvoyé une réponse vide : les images précédentes ont été retirées et la requête a été renvoyée.",
   planMode: "Mode plan", planTitle: "Plan", planApprove: "Approuver", planCancel: "Annuler", planRevise: "Demander des modifications",
   planFeedback: "Facultatif : quoi modifier", planStateApproved: "Approuvé", planStateRevised: "Modifications demandées", planStateCancelled: "Annulé",
   roadmapTitle: "Feuille de route", roadmapActive: "En cours", roadmapDone: "Terminé", roadmapFailed: "À vérifier",
@@ -481,6 +671,46 @@ const FR_STR = {
   planMsgApproved: "L'utilisateur a approuvé le plan. Exécute-le maintenant, étape par étape.",
   planMsgRevised: "L'utilisateur veut modifier le plan : « {text} ». Rappelle propose_plan avec le plan révisé.",
   planMsgCancelled: "L'utilisateur a rejeté le plan. N'applique aucune modification et demande-lui ce qu'il veut.",
+  planPreflight: "Vérification préalable : disponibilité des nœuds",
+  pfStateOk: "prêt", pfStateDisabled: "pack désactivé", pfStateBroken: "erreur d'import", pfStateMissing: "non installé", pfStateUnknown: "inconnu",
+  pfNoteOk: "chargé et prêt à l'emploi", pfNoteOkPack: "chargé depuis {pack}",
+  pfNoteDisabled: "Le pack {pack} est désactivé : active-le et redémarre ComfyUI",
+  pfNoteBroken: "Le pack {pack} est installé mais ce nœud n'est pas enregistré : vérifie le journal du serveur ou prends un autre nœud",
+  pfNoteMissing: "Le pack {repo} n'est pas installé : installe-le et redémarre ComfyUI",
+  pfNoteUnknown: "aucun nœud de ce nom n'existe : remplace-le par un nœud installé",
+  pfNoteAlt: "alternatives installées : {list}",
+  pfSummary: "prêts : {ok} · à configurer : {fix} · inconnus : {bad}",
+  pfStepInstall: "Installer le pack {repo} pour {type}",
+  pfStepEnable: "Activer le pack désactivé {pack} pour {type}",
+  pfStepFix: "Vérifier le pack {pack} : le nœud {type} n'est pas enregistré (journal, dépendances)",
+  pfStepRestart: "Redémarrer ComfyUI pour charger les nouveaux nœuds",
+  planPhaseSetup: "Phase 1 · Installer et redémarrer",
+  planPhaseBuild: "Phase 2 · Construire le graphe",
+  planMsgApprovedSetup: "La vérification préalable a trouvé des nœuds pas encore prêts : {list}. Fais d'abord la phase d'installation et demande à l'utilisateur de redémarrer ComfyUI. Les nouveaux nœuds ne se chargent qu'après le redémarrage, donc construis le graphe seulement quand l'utilisateur revient.",
+  planMsgApprovedUnknown: "La vérification préalable a trouvé des nœuds qui n'existent pas : {list}. Remplace-les par une des alternatives installées avant de construire le graphe.",
+  theme: "Thème", themeSub: "Choisissez un style. L'interrupteur règle la version claire ou sombre.",
+  themeComfy: "ComfyUI", themeClaude: "Claude", themeLux: "Luxe", themeColors: "Couleurs",
+  themeDark: "Mode sombre", themeDarkSub: "Version claire ou sombre du thème choisi.",
+  themeDarkComfy: "Le thème ComfyUI reprend les couleurs de ComfyUI.",
+  tabAI: "IA", tabCustom: "Personnalisation", tabLogs: "Journaux",
+  agentName: "Nom de l'agent", agentNamePlaceholder: "Comfy Agent",
+  agentNameSub: "Comment l'assistant se nomme dans ses réponses.",
+  userName: "Votre nom", userNamePlaceholder: "Votre nom",
+  userNameSub: "Comment l'assistant doit vous appeler.",
+  editImage: "Modifier l'image", edTitle: "Modifier l'image",
+  edDraw: "Pinceau", edCrop: "Recadrer", edText: "Texte", edTextPlaceholder: "Texte à ajouter",
+  edTextHint: "Saisis le texte, puis clique sur l'image pour le placer.",
+  edCropHint: "Fais glisser sur l'image pour choisir la zone de recadrage.",
+  edDrawHint: "Fais glisser sur l'image pour dessiner.",
+  edSize: "Taille", edColor: "Couleur", edRedo: "Rétablir", edRotateLeft: "Pivoter à gauche", edRotateRight: "Pivoter à droite",
+  edReset: "Réinitialiser", edApply: "Appliquer", edCropApply: "Recadrer la sélection",
+  edCropEmpty: "Sélectionne d'abord une zone de recadrage.",
+  edTextEmpty: "Saisis d'abord le texte à ajouter.",
+  edApplied: "Image mise à jour",
+  compatTitle: "Compatibilité", compatSub: "Vérifie la version de ComfyUI et les API du frontal dont ce panneau a besoin.",
+  compatRun: "Vérifier la compatibilité", compatOk: "Compatible", compatIssues: "{n} problème(s) détecté(s)",
+  compatUnknown: "inconnue", compatBackend: "Backend", compatFrontend: "Frontal ComfyUI",
+  compatFailed: "Échec de la vérification : {err}", compatRestart: "Redémarre ComfyUI une fois pour charger les nouvelles routes.",
   actionsTitle: "Actions rapides", actionApplied: "Appliqué au canevas.", actionOpened: "Nœud #{id} {name} ouvert.",
   actionNoNode: "Le nœud #{id} n'est pas sur le canevas.", actionNoError: "Aucune erreur dans ce chat.",
 };
@@ -494,6 +724,42 @@ const BUILTIN = {
 };
 
 let LANG = { code: "en", name: "English" };
+let THEME = "comfy";
+let DARK = false;
+let SETTINGS_TAB = "ai";
+let SETTINGS_TAB_DIR = "";
+let settingsTabBar = null;
+let settingsTabIndicator = null;
+let settingsCredit = null;
+let settingsTabBarWidth = 0;
+
+function loadTheme() {
+  try {
+    const raw = localStorage.getItem(LS_THEME);
+    const v = raw === "glass" ? "colors" : raw;
+    if (THEMES.includes(v)) THEME = v;
+    if (raw === "glass") localStorage.setItem(LS_THEME, "colors");
+    DARK = localStorage.getItem(LS_DARK) === "1";
+  } catch {}
+}
+
+function applyTheme() {
+  if (!ui.root) return;
+  for (const id of THEMES) ui.root.classList.toggle(`ca-theme-${id}`, id === THEME);
+  ui.root.classList.toggle("ca-dark", DARK);
+}
+
+function setTheme(id) {
+  THEME = THEMES.includes(id) ? id : "comfy";
+  try { localStorage.setItem(LS_THEME, THEME); } catch {}
+  applyTheme();
+}
+
+function setDark(on) {
+  DARK = !!on;
+  try { localStorage.setItem(LS_DARK, DARK ? "1" : "0"); } catch {}
+  applyTheme();
+}
 
 function loadLang() {
   try {
@@ -512,6 +778,8 @@ function setLanguage(code) {
   LANG = { code, name: BUILTIN[code].name };
   try { localStorage.setItem(LS_LANG, JSON.stringify(LANG)); } catch {}
   S.startSug = null;
+  settingsTabBar = null;
+  settingsTabIndicator = null;
   renderAll();
 }
 
@@ -532,6 +800,7 @@ const S = {
   refs: [], atts: [], refMenu: null, modeOpen: false, histOpen: false,
   cfg: null, objInfo: null, objInfoAt: 0, hostEl: null, skills: [],
   streamBroken: false, stats: null, updateBusy: false, job: null,
+  compat: null, compatBusy: false, ctxInfo: null,
 };
 const ui = {};
 
@@ -584,6 +853,10 @@ function transientError(e) {
   const message = String(e?.message || "");
   if (/\b(400|401|403|404|405|413|422)\b/.test(message) && !/\b(408|409|425|429|5\d\d)\b/.test(message)) return false;
   return /\b(408|409|425|429|5\d\d)\b/.test(message) || /fetch|network|timeout|timed out|cannot reach|failed to fetch|load failed|econn/i.test(message);
+}
+
+function isCtxOverflow(e) {
+  return /context overflow|context window|too many tokens|needs about \d+ tokens/i.test(String(e?.message || ""));
 }
 
 async function postRetry(route, body, signal, retries) {
@@ -850,6 +1123,11 @@ function exportChatMarkdown(chat) {
     } else if (v.kind === "plan") {
       push(`### ${t("planTitle")} — ${t(v.status === "approved" ? "planStateApproved" : v.status === "revised" ? "planStateRevised" : "planStateCancelled")}`, "");
       if (v.summary) push(`> ${v.summary}`, "");
+      if (v.preflight?.nodes?.length) {
+        push(`**${t("planPreflight")}**`, "");
+        for (const n of v.preflight.nodes) push(`- \`${n.type}\` — ${pfNote(n)}`);
+        push("");
+      }
       (v.steps || []).forEach((s, i) => push(`${i + 1}. ${s}`));
       push("");
     } else if (v.kind === "roadmap") {
@@ -1413,22 +1691,112 @@ async function canvasProblems() {
   return problems;
 }
 
-function searchNodes(q, limit = 15) {
-  const toks = q.toLowerCase().split(/[\s,]+/).filter(Boolean);
-  const res = [];
-  for (const [type, d] of Object.entries(S.objInfo || {})) {
-    const lt = type.toLowerCase(), dn = (d.display_name || "").toLowerCase();
-    const hay = `${lt} ${dn} ${(d.category || "").toLowerCase()} ${(d.description || "").toLowerCase()}`;
-    let score = 0;
-    for (const tk of toks) {
-      if (lt === tk) score += 10;
-      else if (lt.includes(tk) || dn.includes(tk)) score += 4;
-      else if (hay.includes(tk)) score += 1;
-      else { score = -1; break; }
+const NODE_INDEX = { for: null, map: new Map() };
+
+function nodeIndex() {
+  const info = S.objInfo || {};
+  if (NODE_INDEX.for === info) return NODE_INDEX.map;
+  const map = new Map();
+  for (const [type, d] of Object.entries(info)) {
+    const lt = type.toLowerCase();
+    const dn = (d.display_name || "").toLowerCase();
+    const cat = (d.category || "").toLowerCase();
+    const desc = (d.description || "").toLowerCase();
+    const aliases = (d.search_aliases || []).map((a) => String(a).toLowerCase());
+    const ioNames = [];
+    const opts = [];
+    for (const group of Object.values(d.input || {})) {
+      for (const [name, spec] of Object.entries(group || {})) {
+        ioNames.push(name.toLowerCase());
+        const ty = spec[0], o = spec[1] || {};
+        const list = Array.isArray(ty) ? ty : ty === "COMBO" ? (o.options || []) : [];
+        for (const v of list.slice(0, 40)) opts.push(String(v).toLowerCase());
+      }
     }
-    if (score > 0) res.push([score, type]);
+    map.set(type, {
+      type, lt, dn, cat, desc, aliases,
+      io: ioNames.join(" "),
+      opts: opts.join(" ").slice(0, 3000),
+      core: !packOf(d),
+      typeWords: lt.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/([a-zA-Z])(\d)/g, "$1 $2").split(/[^a-z0-9]+/).filter(Boolean),
+      dnWords: dn.split(/[^a-z0-9]+/).filter(Boolean),
+      words: `${lt} ${dn} ${aliases.join(" ")}`.split(/[^a-z0-9]+/).filter(Boolean),
+    });
   }
-  return res.sort((a, b) => b[0] - a[0]).slice(0, limit).map((r) => r[1]);
+  NODE_INDEX.for = info;
+  NODE_INDEX.map = map;
+  return map;
+}
+
+function editDistance(a, b) {
+  if (a === b) return 0;
+  if (!a.length || !b.length) return Math.max(a.length, b.length);
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+function fuzzyToken(tk, n) {
+  if (tk.length < 4) return 0;
+  for (const w of n.words) {
+    if (w.startsWith(tk)) return 3;
+    if (w.length >= 4 && tk.length >= 4 && editDistance(w, tk) <= (tk.length >= 6 ? 2 : 1)) return 2;
+  }
+  return 0;
+}
+
+function queryTokens(q) {
+  return String(q || "").toLowerCase().split(/[\s,/|]+/).filter((x) => x.length > 1);
+}
+
+function scoreNodes(toks, limit = 15) {
+  if (!toks.length) return [];
+  const idx = nodeIndex();
+  const scored = [];
+  for (const n of idx.values()) {
+    let score = 0, hits = 0;
+    for (const tk of toks) {
+      let t = 0;
+      if (n.lt === tk) t = 16;
+      else if (n.typeWords.includes(tk)) t = 10;
+      else if (n.dnWords.includes(tk)) t = 9;
+      else if (n.lt.startsWith(tk)) t = 8;
+      else if (n.lt.includes(tk)) t = 6;
+      else if (n.dn.includes(tk)) t = 7;
+      else if (n.aliases.some((a) => a.includes(tk))) t = 5;
+      else if (n.cat.includes(tk)) t = 4;
+      else if (n.io.includes(tk)) t = 3;
+      else if (n.desc.includes(tk)) t = 2;
+      else if (n.opts.includes(tk)) t = 2;
+      else t = fuzzyToken(tk, n);
+      if (t > 0) { hits++; score += t; }
+    }
+    if (!hits) continue;
+    if (hits === toks.length) score += 10;
+    if (n.core) score += 4;
+    if (score < 3) continue;
+    scored.push({ type: n.type, score, hits, total: toks.length });
+  }
+  scored.sort((a, b) => b.score - a.score || b.hits - a.hits || a.type.localeCompare(b.type));
+  return scored.slice(0, limit);
+}
+
+function searchNodes(q, limit = 15) {
+  return scoreNodes(queryTokens(q), limit);
+}
+
+function suggestNodes(q, limit = 8) {
+  const out = [];
+  for (const tk of queryTokens(q)) {
+    for (const hit of scoreNodes([tk], 3)) if (!out.includes(hit.type)) out.push(hit.type);
+  }
+  return out.slice(0, limit);
 }
 
 function comboValues(w, node) {
@@ -1467,6 +1835,122 @@ function setWidgets(node, values, errors) {
   for (const [k, v] of Object.entries(values || {})) {
     try { setWidget(node, k, v); } catch (e) { if (errors) errors.push(e.message); else throw e; }
   }
+}
+
+function setFileWidget(node, name, value) {
+  const w = (node.widgets || []).find((x) => x.name === name);
+  if (!w) throw new Error(`#${node.id} ${node.type} has no widget "${name}".`);
+  const vals = comboValues(w, node);
+  if (Array.isArray(vals) && !vals.includes(value)) {
+    if (Array.isArray(w.options?.values)) w.options.values.push(value);
+    else if (w.options) w.options.values = [...(vals || []), value];
+  }
+  const old = w.value;
+  w.value = value;
+  try { w.callback?.(value, app.canvas, node, node.pos, null); } catch {}
+  try { node.onWidgetChanged?.(name, value, old, w); } catch {}
+}
+
+async function setWidgetSafe(node, name, value) {
+  const w = (node.widgets || []).find((x) => x.name === name);
+  if (w && w.type === "combo") {
+    const vals = comboValues(w, node);
+    if (Array.isArray(vals) && !vals.includes(value) && MEDIA_FILE.test(String(value)) && (await mediaFileExists(value))) {
+      setFileWidget(node, name, value);
+      return;
+    }
+  }
+  setWidget(node, name, value);
+}
+
+async function setWidgetsSafe(node, values, errors) {
+  if (typeof values === "string") {
+    try { values = JSON.parse(values); } catch { values = {}; if (errors) errors.push("widgets must be a JSON object"); }
+  }
+  for (const [k, v] of Object.entries(values || {})) {
+    try { await setWidgetSafe(node, k, v); } catch (e) { if (errors) errors.push(e.message); else throw e; }
+  }
+}
+
+function chatAtts(chat) {
+  return Array.isArray(chat?.atts) ? chat.atts : [];
+}
+
+function findAtt(chat, name) {
+  const raw = String(name || "").trim().toLowerCase();
+  if (!raw) return null;
+  const atts = chatAtts(chat);
+  const base = raw.split("/").pop();
+  return atts.find((a) => String(a.name).toLowerCase() === raw)
+    || atts.find((a) => String(a.name).toLowerCase() === base)
+    || atts.find((a) => String(a.path || "").toLowerCase() === raw)
+    || atts.find((a) => base && String(a.path || "").toLowerCase().endsWith("/" + base))
+    || null;
+}
+
+function attNames(chat) {
+  return chatAtts(chat).map((a) => a.name).join(", ");
+}
+
+function pickFileWidget(node, att) {
+  const combos = (node.widgets || []).filter((w) => w.type === "combo");
+  if (!combos.length) return null;
+  const kind = String(att.kind || "");
+  if (kind === "3d") {
+    const m = combos.find((w) => /^(model_file|model|file|filename|path)$/i.test(w.name));
+    if (m) return m.name;
+  } else if (kind === "image") {
+    const m = combos.find((w) => /^(image|filename|file|path)$/i.test(w.name));
+    if (m) return m.name;
+  }
+  const want = String(att.path || att.name || "").toLowerCase();
+  const byOpt = combos.find((w) => {
+    const vals = comboValues(w, node);
+    return Array.isArray(vals) && vals.some((x) => String(x).toLowerCase() === want || String(x).toLowerCase().endsWith("/" + want));
+  });
+  if (byOpt) return byOpt.name;
+  if (kind === "3d" || kind === "image") return null;
+  const named = combos.find((w) => /^(image|model_file|file|filename|path|video|audio|glb|model)$/i.test(w.name));
+  return named?.name || combos[0].name;
+}
+
+const LOADER_TYPE = { image: "LoadImage", "3d": "Load3D" };
+
+function loaderFileWidget(node, att) {
+  const name = pickFileWidget(node, att);
+  if (!name) return null;
+  return (node.widgets || []).find((w) => w.name === name && w.type === "combo") || null;
+}
+
+async function createLoaderNode(att) {
+  const type = LOADER_TYPE[att.kind];
+  if (!type) throw new Error(`No loader node fits a "${att.kind}" file. Pass node_id to use a node that is already on the canvas.`);
+  const path = String(att.path || "");
+  for (const n of nodesOf().filter((x) => x.type === type)) {
+    const w = loaderFileWidget(n, att);
+    if (!w) continue;
+    const val = String(w.value ?? "");
+    if (path && val === path) return { node: n, created: false };
+    if (!val || val === "none") return { node: n, created: false };
+  }
+  await getObjInfo().catch(() => {});
+  const node = LG().createNode(type);
+  if (!node) throw new Error(`The node type "${type}" is not available in this ComfyUI installation.`);
+  node.pos = [rightEdge(), 80];
+  app.graph.add(node);
+  return { node, created: true };
+}
+
+async function insertAttachmentNode(att) {
+  try {
+    if (!att.path) throw new Error(t("attUploadFailed"));
+    const { node } = await createLoaderNode(att);
+    const wname = pickFileWidget(node, att);
+    if (!wname) throw new Error(`#${node.id} ${node.type} has no file widget.`);
+    await setWidgetSafe(node, wname, att.path);
+    commit();
+    flash(t("attAdded", { name: att.name, node: node.id }));
+  } catch (e) { flash(e.message); }
 }
 
 function slotIndex(list, key) {
@@ -2035,6 +2519,74 @@ function canvasFacts(ns) {
   };
 }
 
+function slotSummary(n) {
+  const parts = [];
+  let pending = null;
+  const flush = () => {
+    if (!pending) return;
+    parts.push(pending.count > 1 ? `${pending.first}..${pending.last} ${pending.type} (empty)` : `${pending.first} ${pending.type} (empty)`);
+    pending = null;
+  };
+  for (const i of n.inputs || []) {
+    const l = i.link != null ? getLink(i.link) : null;
+    const type = i.type || "ANY";
+    if (l) {
+      flush();
+      const src = nodeById(l.origin_id);
+      parts.push(`${i.name} ${type} <- #${l.origin_id} ${src?.type || ""}`);
+    } else {
+      const m = /^(.*?)(\d+)$/.exec(i.name);
+      const base = m ? m[1] : i.name;
+      const num = m ? Number(m[2]) : 0;
+      if (pending && pending.base === base && pending.type === type && pending.lastNum + 1 === num) {
+        pending.count++;
+        pending.last = i.name;
+        pending.lastNum = num;
+      } else {
+        flush();
+        pending = { base, type, count: 1, first: i.name, last: i.name, lastNum: num };
+      }
+    }
+  }
+  flush();
+  return parts.join("; ");
+}
+
+function groupSlotNames(items) {
+  const groups = new Map();
+  const plain = [];
+  for (const it of items) {
+    const cut = it.indexOf(":");
+    const name = cut >= 0 ? it.slice(0, cut) : it;
+    const type = cut >= 0 ? it.slice(cut + 1) : "";
+    const m = /^(.*?)(\d+)$/.exec(name);
+    if (!m || !m[1]) { plain.push(it); continue; }
+    const key = `${m[1]}|${type}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(name);
+  }
+  const out = [];
+  for (const [key, arr] of groups) {
+    const type = key.split("|")[1];
+    out.push(arr.length > 1 ? `${arr[0]}..${arr[arr.length - 1]} (${arr.length} ${type})` : `${arr[0]} (${type})`);
+  }
+  return out.concat(plain);
+}
+
+function nodeTypeSummary(ns) {
+  const info = S.objInfo || {};
+  const types = [];
+  for (const n of ns) if (!types.includes(n.type)) types.push(n.type);
+  const lines = [];
+  for (const type of types.slice(0, 14)) {
+    const d = info[type];
+    if (!d) { lines.push(`- ${type}: not installed`); continue; }
+    const specs = inputSpecs(d, 1).map((s) => `${s.name}:${s.type}`);
+    lines.push(`- ${type}${d.display_name ? ` "${d.display_name}"` : ""}: ${clip(groupSlotNames(specs).join(", "), 200)}`);
+  }
+  return lines.join("\n");
+}
+
 function canvasSnapshot() {
   const ns = nodesOf();
   const wf = activeWorkflowInfo();
@@ -2073,7 +2625,12 @@ function canvasSnapshot() {
     const inp = Object.entries(b.inputs).map(([k, v]) => `${k}<-#${v[0]}`).join(" ");
     return `#${n.id} ${n.type}${b.title ? ` "${b.title}"` : ""}${b.mode ? ` [${b.mode}]` : ""} {${w}} ${inp}`.trim();
   });
-  return clip(`Workflow "${wf.name}"${wf.modified ? " (unsaved changes)" : ""}: ${ns.length} nodes.\n${meta.join("\n")}\nNodes:\n` + lines.join("\n"), 6000);
+  const slotLines = ns.slice(0, 40).map((n) => `#${n.id} ${n.type}: ${slotSummary(n)}`).filter((x) => !x.endsWith(": "));
+  const typeSummary = nodeTypeSummary(ns);
+  const extra = [];
+  if (typeSummary) extra.push(`Node types (every input slot, connected or not):\n${clip(typeSummary, 1400)}`);
+  if (slotLines.length) extra.push(`Node slots (what is plugged into what):\n${clip(slotLines.join("\n"), 2200)}`);
+  return clip(`Workflow "${wf.name}"${wf.modified ? " (unsaved changes)" : ""}: ${ns.length} nodes.\n${meta.join("\n")}\nNodes:\n` + lines.join("\n") + (extra.length ? "\n" + extra.join("\n") : ""), 9000);
 }
 
 async function modelsSummary() {
@@ -2838,7 +3395,7 @@ const TOOLS = {
       }
       const changed = [], errors = [];
       for (const [n, w] of hits) {
-        try { setWidget(n, w.name, a.value); changed.push({ node: n.id, type: n.type, widget: w.name, value: clipVal(w.value, 120) }); } catch (e) { errors.push(e.message); }
+        try { await setWidgetSafe(n, w.name, a.value); changed.push({ node: n.id, type: n.type, widget: w.name, value: clipVal(w.value, 120) }); } catch (e) { errors.push(e.message); }
       }
       commit();
       return JSON.stringify({ changed, errors });
@@ -2948,15 +3505,33 @@ const TOOLS = {
     },
   },
   find_nodes: {
-    desc: "Search installed node types by keywords (name, display name, category, description). Returns class names with inputs and outputs. Always use this instead of guessing class names.",
-    params: obj({ query: str("Keywords, e.g. 'ksampler', 'load checkpoint', 'upscale image'"), limit: int("Max results, default 12") }, ["query"]),
+    desc: "Search installed node types by keywords. Partial words are enough: '3d', 'glb', 'loader', 'checkpoint', 'upscale' all work, and the query matches the class name, the display name, the category, the search aliases, the input names and the file names in the loader lists. Returns class names with inputs and outputs. If nothing matches, call it again with a shorter or different word instead of guessing a class name.",
+    params: obj({ query: str("Keywords, e.g. 'ksampler', '3d', 'load checkpoint', 'upscale'"), limit: int("Max results, default 12") }, ["query"]),
     run: async (a) => {
       const info = await getObjInfo();
-      const res = searchNodes(String(a.query || ""), Math.min(a.limit || 12, 30)).map((type) => {
-        const d = info[type];
-        return { type, pack: packOf(d) || "core", display_name: d.display_name, category: d.category, description: clip(d.description || "", 140), inputs: inputSpecs(d, 6), outputs: outputSpecs(d) };
+      const q = String(a.query || "").trim();
+      const hits = searchNodes(q, Math.min(a.limit || 12, 30));
+      if (!hits.length) {
+        const near = suggestNodes(q, 8);
+        return near.length
+          ? `No node matched "${q}". Closest node names: ${near.join(", ")}. Call find_nodes again with one of those words or a shorter query.`
+          : `No node matched "${q}". Try a single short word such as "3d", "image", "sampler", "loader", "checkpoint", or call list_custom_nodes to see the installed packs.`;
+      }
+      const res = hits.map((hit) => {
+        const d = info[hit.type];
+        return {
+          type: hit.type,
+          match: hit.hits < hit.total ? `partial (${hit.hits}/${hit.total} keywords)` : "full",
+          pack: packOf(d) || "core",
+          display_name: d.display_name,
+          category: d.category,
+          description: clip(d.description || "", 140),
+          aliases: d.search_aliases || [],
+          inputs: inputSpecs(d, 6),
+          outputs: outputSpecs(d),
+        };
       });
-      return res.length ? JSON.stringify(res) : "No nodes found. Try other keywords or a shorter query.";
+      return JSON.stringify(res);
     },
   },
   get_node_info: {
@@ -2989,12 +3564,50 @@ const TOOLS = {
     run: async (a) => {
       const n = nodeById(a.id);
       if (!n) throw new Error(`No node #${a.id}`);
-      setWidgets(n, a.widgets);
+      await setWidgetsSafe(n, a.widgets);
       if (a.title) n.title = a.title;
       if (Array.isArray(a.pos)) n.pos = [Number(a.pos[0]), Number(a.pos[1])];
       if (a.mode) n.mode = { always: 0, mute: 2, bypass: 4 }[a.mode] ?? 0;
       commit();
       return JSON.stringify(nodeBrief(n));
+    },
+  },
+  apply_attachment: {
+    desc: "Use a file the user attached in this chat: the file is already in the ComfyUI input folder, so set the node's file widget to that exact path (LoadImage.image = \"cat.png\", Load3D.model_file = \"3d/car.glb\"). Without node_id a matching loader node is created (LoadImage for images, Load3D for 3D files).",
+    params: obj({ name: str("Attachment file name from the message"), node_id: int("Node id, optional: create a loader node when omitted"), widget: str("Widget name, e.g. image or model_file") }, ["name"]),
+    mutates: true,
+    run: async (a, ctx) => {
+      const att = findAtt(ctx.chat, a.name);
+      if (!att) throw new Error(`No attachment named "${a.name}". Attached files: ${attNames(ctx.chat) || "none"}.`);
+      if (!att.path) throw new Error(`"${att.name}" was not uploaded to the ComfyUI input folder, so it cannot be used in a node yet.`);
+      let n = null;
+      let created = false;
+      if (a.node_id != null && a.node_id !== "") {
+        n = nodeById(Number(a.node_id));
+        if (!n) throw new Error(`No node #${a.node_id} on the canvas.`);
+      }
+      let wname = a.widget ? String(a.widget) : null;
+      if (wname && n) {
+        const w = (n.widgets || []).find((x) => x.name === wname);
+        if (!w || (w.type !== "combo" && w.type !== "string")) wname = null;
+      }
+      if (!n) {
+        const made = await createLoaderNode(att);
+        n = made.node;
+        created = made.created;
+      }
+      wname = wname || pickFileWidget(n, att);
+      if (!wname) {
+        if (created) { app.graph.remove(n); throw new Error(`#${n.id} ${n.type} has no file widget for a "${att.kind}" file.`); }
+        const made = await createLoaderNode(att);
+        n = made.node;
+        created = made.created;
+        wname = pickFileWidget(n, att);
+        if (!wname) throw new Error(`#${n.id} ${n.type} has no file widget for a "${att.kind}" file.`);
+      }
+      await setWidgetSafe(n, wname, att.path);
+      commit();
+      return JSON.stringify({ node: n.id, type: n.type, widget: wname, value: att.path, attachment: att.name, created });
     },
   },
   disconnect_input: {
@@ -3102,10 +3715,11 @@ const TOOLS = {
     run: async (a, ctx) => askQuestion(ctx.chat, a, ctx.signal),
   },
   propose_plan: {
-    desc: "PLAN MODE only. Show the user a short numbered plan of the concrete steps you are about to take and wait for approval. The tool blocks until the user approves it, asks for changes, or cancels. In plan mode call it before any canvas edit.",
+    desc: "PLAN MODE only. Show the user a short numbered plan of the concrete steps you are about to take and wait for approval. The tool blocks until the user approves it, asks for changes, or cancels. In plan mode call it before any canvas edit. Put every node type the plan needs into 'nodes' so the panel can check that those nodes exist before the plan starts.",
     params: obj({
       summary: str("One short sentence describing the goal"),
       steps: { type: "array", items: { type: "string" }, description: "2-8 short, concrete steps in order" },
+      nodes: { type: "array", items: { type: "string" }, description: "Node type names the plan needs, e.g. ['KSampler','FaceDetailer']. Every type that is not installed is checked before the plan is shown." },
     }, ["steps"]),
     run: async (a, ctx) => askPlan(ctx.chat, a, ctx.signal),
   },
@@ -4051,14 +4665,128 @@ function askQuestion(chat, args, signal) {
   });
 }
 
-function askPlan(chat, args, signal) {
+function planNodeCandidates(steps, explicit) {
+  const out = [];
+  const add = (v) => {
+    const s = String(v || "").trim();
+    if (!/^[A-Za-z_][A-Za-z0-9_.]{1,79}$/.test(s)) return;
+    if (!out.includes(s)) out.push(s);
+  };
+  (Array.isArray(explicit) ? explicit : []).forEach(add);
+  const text = (Array.isArray(steps) ? steps : []).join("\n");
+  for (const m of text.matchAll(/`([A-Za-z_][A-Za-z0-9_.]{1,79})`/g)) add(m[1]);
+  return out.slice(0, 16);
+}
+
+function classWords(type) {
+  return String(type)
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+    .split(/[^A-Za-z0-9]+/)
+    .filter(Boolean)
+    .map((w) => w.toLowerCase())
+    .filter((w) => w.length > 2 && !["node", "class", "comfy", "loader"].includes(w));
+}
+
+function nodeAlternatives(type, info) {
+  const words = classWords(type);
+  if (!words.length) return [];
+  const scored = [];
+  for (const key of Object.keys(info || {})) {
+    const low = key.toLowerCase();
+    let score = 0;
+    for (const w of words) {
+      if (low.includes(w)) score += 30;
+      else if (w.length >= 7 && low.includes(w.slice(0, w.length - 2))) score += 18;
+      else if (w.length >= 6 && low.includes(w.slice(0, 5))) score += 10;
+    }
+    if (score >= 18) scored.push({ type: key, score });
+  }
+  return scored.sort((a, b) => b.score - a.score).slice(0, 4).map((x) => x.type);
+}
+
+function pfBadge(n) {
+  if (n.state === "loaded") return t("pfStateOk");
+  if (n.state === "pack_disabled") return t("pfStateDisabled");
+  if (n.state === "import_error") return t("pfStateBroken");
+  if (n.state === "missing_pack") return t("pfStateMissing");
+  return t("pfStateUnknown");
+}
+
+function pfNote(n) {
+  if (n.state === "loaded") return n.pack ? t("pfNoteOkPack", { pack: n.pack }) : t("pfNoteOk");
+  if (n.state === "pack_disabled") return t("pfNoteDisabled", { pack: n.pack || "?" });
+  if (n.state === "import_error") return t("pfNoteBroken", { pack: n.pack || "?" });
+  if (n.state === "missing_pack") return t("pfNoteMissing", { repo: n.repo || "?" });
+  const alt = (n.alternatives || []).length ? " · " + t("pfNoteAlt", { list: n.alternatives.join(", ") }) : "";
+  return t("pfNoteUnknown") + alt;
+}
+
+function renderPreflight(pf) {
+  const rows = pf.nodes || [];
+  if (!rows.length) return null;
+  const ok = rows.filter((n) => n.state === "loaded").length;
+  const fix = rows.filter((n) => n.state === "missing_pack" || n.state === "pack_disabled" || n.state === "import_error").length;
+  const bad = rows.filter((n) => n.state === "unknown_class").length;
+  const list = h("ul", { class: "ca-pf-list" }, rows.map((n) => h("li", { class: "ca-pf-item ca-pf-" + n.state },
+    h("span", { class: "ca-pf-badge" }, pfBadge(n)),
+    h("span", { class: "ca-pf-type" }, n.type),
+    h("span", { class: "ca-pf-note" }, pfNote(n)))));
+  const setup = (pf.setup || []).length
+    ? h("div", { class: "ca-pf-phase" },
+        h("div", { class: "ca-pf-phase-title" }, t("planPhaseSetup")),
+        h("ul", { class: "ca-pf-phase-items" }, (pf.setup || []).map((x) => h("li", { html: inline(x) }))))
+    : null;
+  return h("div", { class: "ca-preflight" },
+    h("div", { class: "ca-pf-head" }, icon("check-circle"), t("planPreflight"),
+      h("span", { class: "ca-pf-count" }, t("pfSummary", { ok, fix, bad }))),
+    list,
+    setup);
+}
+
+async function planPreflight(steps, explicit) {
+  const types = planNodeCandidates(steps, explicit);
+  if (!types.length) return null;
+  let rows = [];
+  try {
+    const r = await fj(`/crazy_agent/preflight?types=${encodeURIComponent(types.join(","))}`);
+    rows = Array.isArray(r?.nodes) ? r.nodes : [];
+  } catch {
+    return null;
+  }
+  if (!rows.length) return null;
+  if (rows.some((r) => r.state === "unknown_class")) {
+    let info = null;
+    try { info = await getObjInfo(); } catch {}
+    for (const r of rows) {
+      if (r.state === "unknown_class") r.alternatives = nodeAlternatives(r.type, info);
+    }
+  }
+  const setup = [];
+  for (const r of rows) {
+    if (r.state === "missing_pack") setup.push(t("pfStepInstall", { repo: r.repo || "?", type: r.type }));
+    else if (r.state === "pack_disabled") setup.push(t("pfStepEnable", { pack: r.pack || "?", type: r.type }));
+    else if (r.state === "import_error") setup.push(t("pfStepFix", { pack: r.pack || "?", type: r.type }));
+  }
+  if (setup.length) setup.push(t("pfStepRestart"));
+  return {
+    nodes: rows,
+    setup,
+    unknown: rows.filter((r) => r.state === "unknown_class").map((r) => r.type),
+  };
+}
+
+async function askPlan(chat, args, signal) {
+  const steps = (Array.isArray(args.steps) ? args.steps : [])
+    .map((s) => String(s || "").trim()).filter(Boolean).slice(0, 12);
+  const preflight = await planPreflight(steps, args.nodes);
+  if (signal?.aborted) return t("planMsgCancelled");
   return new Promise((resolve) => {
-    const steps = (Array.isArray(args.steps) ? args.steps : [])
-      .map((s) => String(s || "").trim()).filter(Boolean).slice(0, 12);
     const item = {
       kind: "plan",
       summary: String(args.summary || "").trim(),
       steps: steps.length ? steps : [String(args.summary || "").trim() || "…"],
+      preflight,
       status: "pending",
     };
     let settled = false;
@@ -4067,11 +4795,16 @@ function askPlan(chat, args, signal) {
       settled = true;
       item.status = status;
       let roadmap = false;
+      let text = answer;
       if (status === "approved") {
-        try { createRoadmapItem(chat, { summary: item.summary, steps: item.steps }); roadmap = true; } catch {}
+        const setup = item.preflight?.setup || [];
+        const unknown = item.preflight?.unknown || [];
+        try { createRoadmapItem(chat, { summary: item.summary, steps: [...setup, ...item.steps] }); roadmap = true; } catch {}
+        if (setup.length) text += " " + t("planMsgApprovedSetup", { list: setup.join(" | ") });
+        if (unknown.length) text += " " + t("planMsgApprovedUnknown", { list: unknown.join(", ") });
       }
       signal?.removeEventListener("abort", onAbort);
-      resolve(status === "approved" && roadmap ? `${answer} A roadmap was created from this plan. Follow it and call update_roadmap after each step.` : answer);
+      resolve(status === "approved" && roadmap ? `${text} A roadmap was created from this plan. Follow it and call update_roadmap after each step.` : text);
       renderMsgs(); renderHeader(); saveSoon();
     };
     const onAbort = () => finish("cancelled", t("planMsgCancelled"));
@@ -4424,7 +5157,7 @@ async function execTool(tc, ctx) {
 function prepareMessages(chat) {
   const msgs = chat.messages;
   const keepImg = new Set();
-  for (let i = msgs.length - 1, n = 0; i >= 0 && n < 3; i--) {
+  for (let i = msgs.length - 1, n = 0; i >= 0 && n < 2; i--) {
     if (Array.isArray(msgs[i].content) && msgs[i].content.some((p) => p.type === "image")) { keepImg.add(i); n++; }
   }
   return msgs.map((m, i) => {
@@ -4436,21 +5169,34 @@ function prepareMessages(chat) {
   });
 }
 
-const CTX_MAX_CHARS = 60000;
+const CTX_MAX_CHARS = 45000;
 const CTX_MAX_MSGS = 30;
 const CTX_KEEP_MSGS = 10;
+const CTX_IMG_CHARS = 9000;
+
+function ctxBudgetChars(extraChars = 0) {
+  const info = S.ctxInfo || {};
+  const limit = Number(info.limit || 0);
+  if (!limit) return CTX_MAX_CHARS;
+  const base = Number(info.base_tokens || 0) + Number(info.reserve || 0);
+  const left = limit - base - Math.round(Math.max(0, extraChars) / 3.6);
+  return Math.max(6000, Math.round(left * 3.6));
+}
 
 function ctxChars(msgs) {
   let n = 0;
   for (const m of msgs) {
     if (typeof m.content === "string") n += m.content.length;
-    else if (Array.isArray(m.content)) for (const p of m.content) if (p.type === "text" && p.text) n += p.text.length;
+    else if (Array.isArray(m.content)) for (const p of m.content) {
+      if (p.type === "image") n += CTX_IMG_CHARS;
+      else if (p.type === "text" && p.text) n += p.text.length;
+    }
   }
   return n;
 }
 
-function compactStart(msgs) {
-  let i = Math.max(0, msgs.length - CTX_KEEP_MSGS);
+function compactStart(msgs, keep = CTX_KEEP_MSGS) {
+  let i = Math.max(0, msgs.length - keep);
   while (i > 0 && msgs[i].role !== "user") i--;
   return i;
 }
@@ -4484,10 +5230,43 @@ function withSummary(msgs, at, summary) {
   return [{ role: "user", content: `[Earlier conversation compressed to save context]\n${summary}\n[End of compressed context. The goal and constraints above stay in force.]` }, ...msgs.slice(at)];
 }
 
-async function planMessages(chat, signal) {
+function shrinkChatContext(chat) {
+  const msgs = chat.messages;
+  let seen = 0;
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    const m = msgs[i];
+    if (!Array.isArray(m.content)) continue;
+    if (!m.content.some((p) => p.type === "image")) continue;
+    seen++;
+    if (seen <= 1) continue;
+    msgs[i] = { ...m, content: m.content.map((p) => (p.type === "image" ? { type: "text", text: "[earlier image removed to free context]" } : p)) };
+  }
+  chat.ctx = null;
+}
+
+async function compactChat(chat, signal, keep = CTX_KEEP_MSGS) {
+  const at = compactStart(chat.messages, keep);
+  if (at < 2) {
+    shrinkChatContext(chat);
+    return false;
+  }
+  let summary = "";
+  try {
+    const r = await post("/crazy_agent/compact", { goal: compactGoal(chat), transcript: compactTranscript(chat.messages, at), language: LANG.name }, signal);
+    summary = String(r?.summary || "").trim();
+  } catch (e) {
+    if (isAbort(e)) throw e;
+  }
+  if (!summary) summary = localSummary(chat, at);
+  chat.messages = withSummary(chat.messages, at, summary);
+  chat.ctx = null;
+  return true;
+}
+
+async function planMessages(chat, signal, budget = CTX_MAX_CHARS) {
   const msgs = prepareMessages(chat);
-  if (!planOn()) return { messages: msgs, compacted: false };
-  if (chat.messages.length < CTX_MAX_MSGS && ctxChars(chat.messages) < CTX_MAX_CHARS) return { messages: msgs, compacted: false };
+  const heavy = ctxChars(chat.messages) >= budget || chat.messages.length >= CTX_MAX_MSGS;
+  if (!planOn() && !heavy) return { messages: msgs, compacted: false };
   const at = compactStart(chat.messages);
   if (at < 6) return { messages: msgs, compacted: false };
   const cache = chat.ctx;
@@ -4506,6 +5285,7 @@ async function planMessages(chat, signal) {
 
 const ANNOUNCE = /\b(i will|i'll|i am going to|i'm going to|let me(?! know)|i am (?:creating|building|adding|fixing|setting|making)|i'm (?:creating|building|adding|fixing|setting|making)|please wait|one moment|working on it|ich werde|ich erstelle|ich baue|bitte warten|je vais|je crée|je construis|veuillez patienter|zaraz|stworzę|tworzę|buduję|proszę poczekać)\b|сейчас\s+(?:создам|сделаю|построю|добавлю|исправлю|запущу|проверю|загружу|выполню|настрою|поменяю|обновлю)|создаю|строю|добавляю|исправляю|подожд|минутк|займусь/i;
 const NUDGE_ACT = "You described an action but did not call a tool. Call the right tool NOW (see RECIPES). If the work is really finished, reply with one short confirmation.";
+const NUDGE_SEARCH = "Your last node search found nothing. Call find_nodes again with a shorter or different word (for example \"3d\", \"loader\", \"checkpoint\", \"upscale\"), or search_knowledge for the node that does this job. Do not name a class name you did not find.";
 
 const GREETING_WORDS = "(?:hi|hello|hey|hiya|yo|greetings|good\\s+(?:morning|afternoon|evening)|привет(?:ик)?|здравствуй(?:те)?|здорово|добрый\\s+(?:день|вечер)|доброе\\s+утро|hallo|servus|moin|guten\\s+(?:tag|morgen|abend)|cześć|czesc|witaj(?:cie)?|dzień\\s+dobry|dzien\\s+dobry|bonjour|salut|coucou|bonsoir)";
 const GREETING_RE = new RegExp(`^(?:(?:${GREETING_WORDS})(?:\\s+there)?[\\s!?.,~…-]*)+$`, "iu");
@@ -4545,7 +5325,7 @@ async function runAgent(chat) {
   chat.running = true;
   chat.abort = new AbortController();
   const signal = chat.abort.signal;
-  let finished = false, nudges = 0, toolsUsed = 0, loopGuards = 0, repeats = 0, compactedShown = false;
+  let finished = false, nudges = 0, toolsUsed = 0, loopGuards = 0, repeats = 0, compactedShown = false, rescued = false, overflows = 0, lastToolOut = "";
   let lastSig = "", lastOutSig = "", hitLimit = false;
   const maxSteps = Math.max(1, Math.min(200, Number(S.cfg?.max_steps) || MAX_STEPS));
   const runStart = Date.now();
@@ -4593,14 +5373,16 @@ async function runAgent(chat) {
         }
       };
       let res = null, modelError = null;
-      const stepMsgs = await planMessages(chat, signal);
+      const canvas = canvasSnapshot();
+      const budget = ctxBudgetChars(packs.length + models.length + canvas.length);
+      const stepMsgs = await planMessages(chat, signal, budget);
       if (stepMsgs.compacted && !compactedShown) {
         compactedShown = true;
         pushView(chat, { kind: "note", text: t("ctxCompressed") });
       }
       try {
         res = await callModel(
-          { messages: stepMsgs.messages, tools: toolDefs({ readOnly }), context: { perm: S.perm, language: LANG.name, packs, canvas: canvasSnapshot(), models, smalltalk: readOnly, target: chat.target || null, memory: loadMemory().slice(0, 20).map((m) => m.text) } },
+          { messages: stepMsgs.messages, tools: toolDefs({ readOnly }), context: { perm: S.perm, language: LANG.name, packs, canvas, models, smalltalk: readOnly, target: chat.target || null, memory: loadMemory().slice(0, 20).map((m) => m.text) } },
           signal,
           onEvent,
           (attempt) => {
@@ -4621,6 +5403,16 @@ async function runAgent(chat) {
         if (chat.id === S.activeId) renderMsgs();
       }
       if (modelError) {
+        if (isCtxOverflow(modelError) && overflows < 2) {
+          overflows++;
+          const trimmed = await compactChat(chat, signal, overflows === 1 ? 4 : 2);
+          if (stepViews.length) {
+            chat.view = chat.view.filter((v) => !stepViews.includes(v));
+            renderMsgs();
+          }
+          pushView(chat, { kind: "note", text: t("ctxCompressed") });
+          if (trimmed) continue;
+        }
         if (live) live.interrupted = true;
         if (live && !live.text) chat.view = chat.view.filter((v) => v !== live);
         throw modelError;
@@ -4660,14 +5452,25 @@ async function runAgent(chat) {
       }
       chat.messages.push({ role: "assistant", content: res.content || "", tool_calls: res.tool_calls?.length ? res.tool_calls : undefined });
       if (!res.tool_calls?.length) {
-        const unfinished = !text || (ANNOUNCE.test(text) && text.length < 700);
+        const emptySearch = /No node matched/i.test(lastToolOut);
+        const unfinished = !text || (ANNOUNCE.test(text) && text.length < 700) || emptySearch;
+        if (!text && !rescued) {
+          rescued = true;
+          shrinkChatContext(chat);
+          if (stepViews.length) {
+            chat.view = chat.view.filter((v) => !stepViews.includes(v));
+            renderMsgs();
+          }
+          pushView(chat, { kind: "note", text: t("ctxRescued") });
+          continue;
+        }
         if (nudges < 2 && unfinished) {
           nudges++;
           if (stepViews.length) {
             chat.view = chat.view.filter((v) => !stepViews.includes(v));
             renderMsgs();
           }
-          chat.messages.push({ role: "user", content: NUDGE_ACT, nudge: true });
+          chat.messages.push({ role: "user", content: emptySearch ? NUDGE_SEARCH : NUDGE_ACT, nudge: true });
           continue;
         }
         if (!text) {
@@ -4692,6 +5495,7 @@ async function runAgent(chat) {
       }
       if (signal.aborted) break;
       const outSig = outs.map((o) => clip(o, 1200)).join("|");
+      lastToolOut = outs.join("\n");
       if (callSig === lastSig && outSig === lastOutSig) repeats++;
       else { repeats = 0; lastSig = callSig; lastOutSig = outSig; }
       if (repeats >= 2) {
@@ -4835,15 +5639,20 @@ async function send() {
   for (const d of ctx.images) parts.push({ type: "image", data_url: d });
   for (const a of atts) {
     if (a.kind === "file") parts.push({ type: "text", text: `<file name="${a.name}">\n${a.text}\n</file>` });
-    else if (a.kind === "3d") parts.push({ type: "text", text: `<file name="${a.name}">3D model attached.${a.path ? ` Uploaded to the ComfyUI input folder as "${a.path}". Use that exact value in 3D loader widgets such as Load3D.model_file.` : " Upload failed, so it is not in the ComfyUI input folder."} Size: ${a.size || 0} bytes.</file>` });
+    else if (a.kind === "3d") parts.push({ type: "text", text: `<file name="${a.name}">3D model attached.${a.path ? ` It is in the ComfyUI input folder as "${a.path}". Set the Load3D "model_file" widget to exactly that value, or call apply_attachment with this file name.` : " The upload to the ComfyUI input folder failed, so it cannot be used in a node yet."} Size: ${a.size || 0} bytes.</file>` });
+    else if (a.kind === "image") {
+      parts.push({ type: "text", text: `<file name="${a.name}">Image attached.${a.path ? ` It is in the ComfyUI input folder as "${a.path}". Set the LoadImage "image" widget to exactly that value, or call apply_attachment with this file name.` : " The upload to the ComfyUI input folder failed, so it cannot be used in a node yet."} Size: ${a.size || 0} bytes.</file>` });
+      parts.push({ type: "image", data_url: a.dataUrl, name: a.name });
+    }
     else parts.push({ type: a.kind, data_url: a.dataUrl, name: a.name });
   }
   const mid = uid();
   keepSnap(chat, mid, snapshotGraph());
+  chat.atts = atts.map((a) => ({ name: a.name, kind: a.kind, size: a.size || 0, path: a.path || "" }));
   chat.messages.push({ role: "user", content: parts, mid });
   chat.running = false;
   if (!chat.title) chat.title = clip(text || refs[0]?.label || t("untitled"), 42);
-  pushView(chat, { kind: "user", mid, text, refs: refs.map((r) => ({ kind: r.kind, label: r.label, thumb: r.thumb })), thumbs: atts.filter((a) => a.thumb).map((a) => a.thumb) });
+  pushView(chat, { kind: "user", mid, text, refs: refs.map((r) => ({ kind: r.kind, label: r.label, thumb: r.thumb })), thumbs: atts.filter((a) => a.thumb).map((a) => a.thumb), atts: chat.atts });
   renderChat(true);
   runAgent(chat);
 }
@@ -4930,9 +5739,26 @@ function stepRow(i, idx) {
   return d;
 }
 
+function attSizeLabel(size) {
+  const n = Number(size) || 0;
+  if (!n) return "";
+  return n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
+}
+
+function attChip(a) {
+  const chip = h("span", { class: "ca-chip ro att", title: a.path ? `${t("attInInput")}: ${a.path}` : t("attUploadFailed") },
+    icon(ATT_ICON[a.kind] || "file"),
+    h("span", { class: "ca-att-name" }, a.name),
+    attSizeLabel(a.size) ? h("span", { class: "ca-att-size" }, attSizeLabel(a.size)) : null,
+    a.path ? h("span", { class: "ca-att-path" }, a.path) : null);
+  if (a.path && LOADER_TYPE[a.kind]) chip.appendChild(h("button", { class: "ca-x", title: t("attToCanvas"), onClick: () => insertAttachmentNode(a) }, icon("plus")));
+  return chip;
+}
+
 function renderItemInner(chat, v) {
   if (v.kind === "user") {
     const chips = [...(v.refs || []).map((r) => h("span", { class: "ca-chip ro" }, r.thumb ? h("img", { src: r.thumb }) : icon(r.kind === "node" ? "box" : r.kind === "workflow" ? "sitemap" : "image"), r.label)),
+      ...(v.atts || []).filter((a) => a.kind !== "image").map((a) => attChip(a)),
       ...(v.thumbs || []).map((d) => h("img", { class: "ca-thumb", src: d }))];
     if (v.editing) {
       const ta = h("textarea", { class: "ca-edit-ta", rows: "3" });
@@ -5001,7 +5827,10 @@ function renderItemInner(chat, v) {
   }
   if (v.kind === "plan") {
     const pending = v.status === "pending";
+    const pf = v.preflight;
     const steps = h("ol", { class: "ca-plan-steps" }, (v.steps || []).map((s) => h("li", { html: inline(s) })));
+    const pfBlock = renderPreflight(pf);
+    const phaseTitle = pf && (pf.setup || []).length ? h("div", { class: "ca-plan-phase" }, t("planPhaseBuild")) : null;
     let actions = null;
     if (pending) {
       const fb = h("input", { class: "ca-q-input", placeholder: t("planFeedback") });
@@ -5019,6 +5848,8 @@ function renderItemInner(chat, v) {
     return h("div", { class: "ca-plan " + v.status },
       h("div", { class: "ca-q-title" }, icon("list-check"), t("planTitle")),
       v.summary ? h("div", { class: "ca-plan-sum" }, v.summary) : null,
+      pfBlock,
+      phaseTitle,
       steps,
       actions);
   }
@@ -5195,7 +6026,7 @@ function renderHeader() {
   const pending = S.chats.some((c) => c.view.some((v) => (v.kind === "approval" && v.status === "pending") || (v.kind === "question" && v.status === "pending") || (v.kind === "plan" && v.status === "pending")));
   ui.header.replaceChildren(
     h("div", { class: "ca-top" },
-      h("div", { class: "ca-title" }, t("title"), h("span", { class: "ca-badge" }, t("beta"))),
+      h("div", { class: "ca-title" }, h("span", { class: "ca-title-name" }, S.cfg?.agent_name || t("title")), h("span", { class: "ca-badge" }, t("beta"))),
       h("div", { class: "ca-top-btns" },
         h("button", { class: "ca-icon-btn", title: t("exportChat"), onClick: () => exportChat(chat, "md") }, icon("download")),
         h("button", { class: "ca-icon-btn", title: t("newChat"), onClick: () => { newChat(); S.view = "chat"; closePops(); renderAll(); renderChat(true); saveSoon(); } }, icon("plus")),
@@ -5310,7 +6141,8 @@ function renderChips() {
   ui.chips.replaceChildren(
     ...S.refs.map((r) => h("span", { class: "ca-chip" }, r.thumb ? h("img", { src: r.thumb }) : icon(r.kind === "node" ? "box" : r.kind === "asset" ? (ATT_ICON[r.assetKind] || "file") : "sitemap"), r.label,
       h("button", { class: "ca-x", onClick: () => { S.refs = S.refs.filter((x) => x !== r); renderChips(); } }, icon("times")))),
-    ...S.atts.map((a) => h("span", { class: "ca-chip" }, a.thumb ? h("img", { src: a.thumb }) : icon(ATT_ICON[a.kind] || "file"), a.name,
+    ...S.atts.map((a) => h("span", { class: "ca-chip", title: a.path ? `${t("attInInput")}: ${a.path}` : (a.kind === "image" ? a.name : t("attUploadFailed")) }, a.thumb ? h("img", { src: a.thumb, class: a.kind === "image" ? "ca-chip-thumb" : null, title: a.kind === "image" ? t("editImage") : null, onClick: a.kind === "image" ? () => openImageEditor(a) : null }) : icon(ATT_ICON[a.kind] || "file"), a.name,
+      a.kind === "image" ? h("button", { class: "ca-x", title: t("editImage"), onClick: () => openImageEditor(a) }, icon("pencil")) : null,
       h("button", { class: "ca-x", onClick: () => { S.atts = S.atts.filter((x) => x !== a); renderChips(); } }, icon("times")))));
   ui.chips.hidden = !S.refs.length && !S.atts.length;
 }
@@ -5424,6 +6256,86 @@ async function refreshSkills() {
   if (S.view === "settings") renderSettings();
 }
 
+function frontendCompatChecks() {
+  const items = [];
+  const add = (id, name, ok, detail, level = "fail") => items.push({ id, name, ok: !!ok, level: ok ? "ok" : level, detail });
+  const wf = app.extensionManager?.workflow;
+  add("graph", "Canvas graph API", !!app.graph, "app.graph");
+  add("graph_to_prompt", "graphToPrompt", typeof app.graphToPrompt === "function", "Converts the canvas into a prompt");
+  add("queue", "Queue API", typeof api.queuePrompt === "function", "api.queuePrompt");
+  add("fetch", "API client", typeof api.fetchApi === "function", "api.fetchApi");
+  add("events", "Execution events", typeof api.addEventListener === "function", "executed / progress / error events");
+  add("sidebar", "Sidebar tab API", !!app.extensionManager?.registerSidebarTab, "app.extensionManager.registerSidebarTab");
+  add("workflow", "Workflow API", !!wf?.activeWorkflow, "Pinned workflow and unsaved-change guard", "warn");
+  add("litegraph", "LiteGraph", !!window.LiteGraph, "Node graph runtime", "warn");
+  add("viewport", "Canvas viewport", !!app.canvas?.ds, "Viewport reporting for canvas context", "warn");
+  return items;
+}
+
+async function runCompatCheck() {
+  if (S.compatBusy) return;
+  S.compatBusy = true; S.compat = null;
+  if (S.view === "settings") renderSettings();
+  let backend = null, error = "";
+  try { backend = await fj("/crazy_agent/compatibility"); } catch (e) { error = e.message; }
+  const checks = [...(backend?.checks || []), ...frontendCompatChecks()];
+  if (!backend) checks.unshift({ id: "backend_route", name: "Backend compatibility route", ok: false, level: "warn", detail: t("compatRestart") });
+  S.compat = { backend, checks, error };
+  S.compatBusy = false;
+  if (S.view === "settings") renderSettings();
+}
+
+function compatSummaryText(checks) {
+  const fails = checks.filter((c) => c.level === "fail").length;
+  const warns = checks.filter((c) => c.level === "warn").length;
+  return fails || warns ? t("compatIssues", { n: fails + warns }) : t("compatOk");
+}
+
+function ensureSettingsTabBar() {
+  if (settingsTabBar) return settingsTabBar;
+  settingsTabIndicator = h("span", { class: "ca-settings-tab-ind" });
+  settingsTabBar = h("div", { class: "ca-settings-tabs", role: "tablist" }, settingsTabIndicator,
+    SETTINGS_TABS.map(([id, key]) => h("button", {
+      class: "ca-settings-tab" + (SETTINGS_TAB === id ? " active" : ""),
+      type: "button", role: "tab", "aria-selected": String(SETTINGS_TAB === id),
+      onClick: () => selectSettingsTab(id),
+    }, t(key))));
+  return settingsTabBar;
+}
+
+function selectSettingsTab(id) {
+  if (id === SETTINGS_TAB) return;
+  const from = SETTINGS_TABS.findIndex(([x]) => x === SETTINGS_TAB);
+  const to = SETTINGS_TABS.findIndex(([x]) => x === id);
+  SETTINGS_TAB_DIR = to > from ? "next" : "prev";
+  SETTINGS_TAB = id;
+  renderSettings();
+  if (ui.settings) ui.settings.scrollTop = 0;
+}
+
+function syncSettingsTabs(animate) {
+  if (!settingsTabBar || !settingsTabIndicator) return;
+  const btns = [...settingsTabBar.querySelectorAll(".ca-settings-tab")];
+  btns.forEach((b, i) => {
+    const active = SETTINGS_TABS[i][0] === SETTINGS_TAB;
+    b.classList.toggle("active", active);
+    b.setAttribute("aria-selected", String(active));
+  });
+  const active = btns.find((b) => b.classList.contains("active"));
+  if (!active) return;
+  const barRect = settingsTabBar.getBoundingClientRect();
+  const activeRect = active.getBoundingClientRect();
+  const originX = barRect.left + settingsTabBar.clientLeft;
+  settingsTabBarWidth = barRect.width;
+  if (!animate) settingsTabIndicator.classList.add("ca-tab-ind-plain");
+  settingsTabIndicator.style.width = `${activeRect.width}px`;
+  settingsTabIndicator.style.transform = `translateX(${activeRect.left - originX}px)`;
+  if (!animate) {
+    void settingsTabIndicator.offsetWidth;
+    settingsTabIndicator.classList.remove("ca-tab-ind-plain");
+  }
+}
+
 function renderSettings() {
   const c = S.cfg || {};
   const f = {};
@@ -5463,7 +6375,40 @@ function renderSettings() {
   langSel.value = LANG.code;
   langSel.addEventListener("change", () => setLanguage(langSel.value));
   const langBlock = h("div", { class: "ca-field" }, h("span", {}, t("language")), langSel);
+  const themeBtns = {};
+  const themeGrid = h("div", { class: "ca-theme-grid" }, THEMES.map((id) => {
+    const btn = h("button", { class: "ca-theme-card", type: "button", title: t(THEME_KEYS[id]), onClick: () => { setTheme(id); syncThemeControls(); } },
+      h("span", { class: `ca-pv p-${id}` },
+        h("span", { class: "ca-pv-dot" }),
+        h("span", { class: "ca-pv-line user" }),
+        h("span", { class: "ca-pv-line bot" }),
+        h("span", { class: "ca-pv-input" })),
+      h("span", { class: "ca-pv-name" }, t(THEME_KEYS[id])));
+    themeBtns[id] = btn;
+    return btn;
+  }));
+  const darkLever = h("button", { class: "ca-lever", type: "button", role: "switch", "aria-checked": "false", title: t("themeDark") }, h("span", { class: "ca-lever-knob" }));
+  darkLever.addEventListener("click", () => { if (THEME === "comfy") return; setDark(!DARK); syncThemeControls(); });
+  const darkRow = h("div", { class: "ca-theme-mode" }, h("span", {}, t("themeDark")), darkLever);
+  const darkHint = h("div", { class: "ca-sub" }, "");
+  function syncThemeControls() {
+    for (const [id, btn] of Object.entries(themeBtns)) btn.classList.toggle("active", id === THEME);
+    darkLever.classList.toggle("on", DARK);
+    darkLever.setAttribute("aria-checked", DARK ? "true" : "false");
+    darkLever.disabled = THEME === "comfy";
+    darkRow.classList.toggle("off", THEME === "comfy");
+    darkHint.textContent = THEME === "comfy" ? t("themeDarkComfy") : t("themeDarkSub");
+  }
+  syncThemeControls();
+  const themeBlock = h("div", { class: "ca-field ca-theme-field" }, h("span", {}, t("theme")), themeGrid, h("div", { class: "ca-sub" }, t("themeSub")), darkRow, darkHint);
+  f.agentName = h("input", { value: c.agent_name || "", placeholder: t("agentNamePlaceholder"), maxlength: "40", autocomplete: "off" });
+  f.userName = h("input", { value: c.user_name || "", placeholder: t("userNamePlaceholder"), maxlength: "40", autocomplete: "off" });
+  const nameBlock = h("div", { class: "ca-field ca-name-field" },
+    h("span", {}, t("agentName")), f.agentName, h("div", { class: "ca-sub" }, t("agentNameSub")),
+    h("span", { class: "ca-name-gap" }, t("userName")), f.userName, h("div", { class: "ca-sub" }, t("userNameSub")));
   const status = h("div", { class: "ca-status" });
+  const statusCustom = h("div", { class: "ca-status" });
+  const showStatus = (text) => { status.textContent = text; statusCustom.textContent = text; };
   const loadBtn = h("button", { class: "ca-btn", onClick: async () => {
     status.textContent = t("loading");
     try {
@@ -5474,21 +6419,27 @@ function renderSettings() {
     } catch (e) { status.textContent = e.message; }
   } }, t("loadModels"));
   async function saveCfg(report = true) {
-    const body = { provider: f.provider.value, base_url: f.base.value, model: f.model.value, max_tokens: f.max.value, temperature: f.temp.value, max_steps: f.steps.value, stream: f.stream.checked, confirm_destructive: f.confirm.checked, highlight_changes: f.highlight.checked, update_check: f.updCheck.checked, auto_update: f.updAuto.checked, vision: f.vision.checked, suggestions: f.sugg.checked, search_provider: f.sprov.value, search_url: f.surl.value, extra_prompt: f.extra.value };
+    const body = { provider: f.provider.value, base_url: f.base.value, model: f.model.value, max_tokens: f.max.value, temperature: f.temp.value, max_steps: f.steps.value, stream: f.stream.checked, confirm_destructive: f.confirm.checked, highlight_changes: f.highlight.checked, update_check: f.updCheck.checked, auto_update: f.updAuto.checked, vision: f.vision.checked, suggestions: f.sugg.checked, search_provider: f.sprov.value, search_url: f.surl.value, extra_prompt: f.extra.value, agent_name: f.agentName.value, user_name: f.userName.value };
     if (f.key.value) body.api_key = f.key.value;
     if (f.skey.value) body.search_key = f.skey.value;
     S.cfg = await post("/crazy_agent/config", body);
     S.streamBroken = false;
     S.startSug = null;
     f.key.value = ""; f.skey.value = "";
-    if (report) status.textContent = t("saved");
+    f.agentName.value = S.cfg.agent_name || ""; f.userName.value = S.cfg.user_name || "";
+    renderHeader();
+    if (report) showStatus(t("saved"));
   }
-  const saveBtn = h("button", { class: "ca-btn primary", onClick: async () => { try { await saveCfg(); } catch (e) { status.textContent = e.message; } } }, t("save"));
+  const saveBtn = h("button", { class: "ca-btn primary", onClick: async () => { try { await saveCfg(); } catch (e) { showStatus(e.message); } } }, t("save"));
+  const saveBtnCustom = h("button", { class: "ca-btn primary", onClick: async () => { try { await saveCfg(); } catch (e) { showStatus(e.message); } } }, t("save"));
   const link = (href, ic, label) => h("a", { href, target: "_blank", rel: "noopener" }, icon(ic), label);
-  const credit = h("div", { class: "ca-credit" },
-    h("div", { class: "ca-version" }, h("span", { class: "ca-version-badge", title: "ComfyUI-Agent beta 0.4.7" }, "beta 0.4.7")),
-    h("div", {}, "Created by CrazyDashTool"),
-    h("div", { class: "ca-credit-links" }, link("https://github.com/CrazyDashTool", "github", "GitHub"), link("https://www.youtube.com/@CrazyDashToolOficial", "youtube", "YouTube")));
+  if (!settingsCredit) {
+    settingsCredit = h("div", { class: "ca-credit" },
+      h("div", { class: "ca-version" }, h("span", { class: "ca-version-badge", title: "ComfyUI-Agent beta 0.4.8" }, "beta 0.4.8")),
+      h("div", {}, "Created by CrazyDashTool"),
+      h("div", { class: "ca-credit-links" }, link("https://github.com/CrazyDashTool", "github", "GitHub"), link("https://www.youtube.com/@CrazyDashToolOficial", "youtube", "YouTube")));
+  }
+  const credit = settingsCredit;
   const logBox = h("pre", { class: "ca-logbox", hidden: true });
   const updStatus = h("div", { class: "ca-status" });
   const updBtn = h("button", { class: "ca-btn", onClick: () => checkUpdates(true, updStatus) }, icon("refresh"), t("checkUpdates"));
@@ -5504,6 +6455,28 @@ function renderSettings() {
   } }, t("getLogs"));
   const perf = S.stats || newStats();
   const statRow = (k, val) => h("div", { class: "ca-rs-row" }, h("span", {}, k), h("span", { class: "ca-rs-v" }, val));
+  const compatBtn = h("button", { class: "ca-btn", onClick: () => runCompatCheck() }, icon("refresh"), S.compatBusy ? t("loading") : t("compatRun"));
+  const compatBox = h("div", { class: "ca-compat" });
+  if (S.compat) {
+    const checks = S.compat.checks || [];
+    const fails = checks.filter((c) => c.level === "fail").length;
+    const warns = checks.filter((c) => c.level === "warn").length;
+    const good = !fails && !warns;
+    const b = S.compat.backend;
+    const versions = b
+      ? `ComfyUI ${b.comfyui || t("compatUnknown")} · ${t("compatFrontend")} ${b.frontend || t("compatUnknown")} · Python ${b.python || t("compatUnknown")}`
+      : S.compat.error;
+    compatBox.append(
+      h("div", { class: `ca-compat-summary ${good ? "ok" : fails ? "bad" : "warn"}` },
+        icon(good ? "check-circle" : "exclamation-triangle"), h("span", {}, compatSummaryText(checks))),
+      h("div", { class: "ca-compat-versions" }, versions),
+      ...checks.map((c) => h("div", { class: "ca-compat-row" },
+        h("span", { class: `ca-compat-dot ${c.level}` }),
+        h("div", { class: "ca-grow" }, h("div", { class: "ca-compat-name" }, c.name || c.id), h("div", { class: "ca-sub" }, c.detail || "")),
+        h("span", { class: `ca-compat-state ${c.level}` }, c.level === "ok" ? "OK" : c.level === "warn" ? "!" : "×"))));
+  } else {
+    compatBox.append(h("div", { class: "ca-pop-sub" }, S.compatBusy ? t("loading") : t("compatSub")));
+  }
   const perfBlock = h("div", {},
     h("div", { class: "ca-rs-body" },
       statRow(t("stRuns"), `${perf.runs} · ${perf.ok} ${t("stOk").toLowerCase()} / ${perf.err} ${t("stFailed").toLowerCase()} / ${perf.stopped} ${t("stStopped").toLowerCase()}`),
@@ -5512,11 +6485,11 @@ function renderSettings() {
       statRow(t("stCost"), fmtCost(perf.total ? perf.cost : null) || t("stCostNA")),
       statRow(t("stErrors"), String(perf.errors))),
     h("div", { class: "ca-inline" }, h("button", { class: "ca-btn", onClick: () => { S.stats = newStats(); renderSettings(); } }, icon("refresh"), t("stReset"))));
-  ui.settings.replaceChildren(
-    langBlock, field(t("preset"), preset), field(t("provider"), f.provider), field(t("baseUrl"), f.base), field(t("apiKey"), f.key),
+  const tabBar = ensureSettingsTabBar();
+  const aiSection = h("div", { class: "ca-settings-section" },
+    field(t("preset"), preset), field(t("provider"), f.provider), field(t("baseUrl"), f.base), field(t("apiKey"), f.key),
     field(t("model"), h("div", { class: "ca-inline" }, f.model, loadBtn)), dl,
-    field(t("maxTokens"), f.max), field(t("temperature"), f.temp),
-    field(t("maxSteps"), f.steps),
+    field(t("maxTokens"), f.max), field(t("temperature"), f.temp), field(t("maxSteps"), f.steps),
     h("label", { class: "ca-check" }, f.stream, h("span", {}, t("streamOpt"))),
     h("label", { class: "ca-check" }, f.confirm, h("span", {}, t("confirmDestructive"))),
     h("label", { class: "ca-check" }, f.highlight, h("span", {}, t("highlightChanges"))),
@@ -5524,28 +6497,49 @@ function renderSettings() {
     h("label", { class: "ca-check" }, f.sugg, h("span", {}, t("suggestionsOpt"))),
     field(t("webSearch"), f.sprov), searchKeyField, searchUrlField,
     field(t("extra"), f.extra),
-    h("div", { class: "ca-inline" }, saveBtn, status),
-    h("div", { class: "ca-pop-title", style: { marginTop: "14px" } }, t("updateTitle")),
+    h("div", { class: "ca-inline ca-save-bar" }, saveBtn, status));
+  const customSection = h("div", { class: "ca-settings-section" },
+    langBlock, themeBlock, nameBlock,
+    h("div", { class: "ca-pop-title" }, t("skills")),
+    S.skills.length
+      ? S.skills.map((s) => h("div", { class: "ca-row-item static" }, h("div", { class: "ca-grow" }, h("div", {}, s.name), h("div", { class: "ca-sub" }, s.description)),
+        h("button", { class: "ca-icon-btn sm", title: t("del"), onClick: async () => { await post("/crazy_agent/skills/delete", { name: s.name }); refreshSkills(); } }, icon("trash"))))
+      : h("div", { class: "ca-pop-sub" }, t("noSkills")),
+    h("div", { class: "ca-inline ca-save-bar" }, saveBtnCustom, statusCustom));
+  const logsSection = h("div", { class: "ca-settings-section" },
+    h("div", { class: "ca-pop-title" }, t("exportChat")),
+    h("div", { class: "ca-inline" },
+      h("button", { class: "ca-btn", onClick: () => exportChat(activeChat(), "md") }, icon("file-export"), t("exportMd")),
+      h("button", { class: "ca-btn", onClick: () => exportChat(activeChat(), "json") }, icon("file-export"), t("exportJson"))),
+    h("div", { class: "ca-pop-title" }, t("logs")),
+    h("div", { class: "ca-inline" }, logBtn),
+    logBox,
+    h("div", { class: "ca-pop-title" }, t("performance")),
+    perfBlock,
+    h("div", { class: "ca-pop-title" }, t("updateTitle")),
     h("div", { class: "ca-pop-sub" }, t("updateSub")),
     h("label", { class: "ca-check" }, f.updCheck, h("span", {}, t("updateCheckOpt"))),
     h("label", { class: "ca-check" }, f.updAuto, h("span", {}, t("autoUpdateOpt"))),
     h("div", { class: "ca-inline" }, updBtn, updApplyBtn),
     updStatus,
-    h("div", { class: "ca-pop-title", style: { marginTop: "14px" } }, t("logs")),
-    h("div", { class: "ca-inline" }, logBtn),
-    logBox,
-    h("div", { class: "ca-pop-title", style: { marginTop: "14px" } }, t("exportChat")),
-    h("div", { class: "ca-inline" },
-      h("button", { class: "ca-btn", onClick: () => exportChat(activeChat(), "md") }, icon("file-export"), t("exportMd")),
-      h("button", { class: "ca-btn", onClick: () => exportChat(activeChat(), "json") }, icon("file-export"), t("exportJson"))),
-    h("div", { class: "ca-pop-title", style: { marginTop: "14px" } }, t("performance")),
-    perfBlock,
-    h("div", { class: "ca-pop-title", style: { marginTop: "14px" } }, t("skills")),
-    S.skills.length
-      ? S.skills.map((s) => h("div", { class: "ca-row-item static" }, h("div", { class: "ca-grow" }, h("div", {}, s.name), h("div", { class: "ca-sub" }, s.description)),
-        h("button", { class: "ca-icon-btn sm", title: t("del"), onClick: async () => { await post("/crazy_agent/skills/delete", { name: s.name }); refreshSkills(); } }, icon("trash"))))
-      : h("div", { class: "ca-pop-sub" }, t("noSkills")),
-    credit);
+    h("div", { class: "ca-pop-title" }, t("compatTitle")),
+    h("div", { class: "ca-inline" }, compatBtn),
+    compatBox);
+  const section = SETTINGS_TAB === "custom" ? customSection : SETTINGS_TAB === "logs" ? logsSection : aiSection;
+  const switching = !!SETTINGS_TAB_DIR;
+  if (switching) {
+    section.setAttribute("data-dir", SETTINGS_TAB_DIR);
+    SETTINGS_TAB_DIR = "";
+  }
+  const prevSection = ui.settings.querySelector(".ca-settings-section");
+  const prevCredit = ui.settings.querySelector(".ca-credit");
+  if (prevSection) {
+    prevSection.replaceWith(section);
+    if (prevCredit && prevCredit !== credit) prevCredit.replaceWith(credit);
+  } else {
+    ui.settings.replaceChildren(tabBar, section, credit);
+  }
+  syncSettingsTabs(switching);
 }
 
 let caAudio = null, soundQueued = false;
@@ -5703,6 +6697,312 @@ async function uploadAttachment(file, subfolder) {
   return `${(j.subfolder || "").replace(/\/+$/, "")}${j.subfolder ? "/" : ""}${j.name}`;
 }
 
+const ED_MAX = 1600;
+const ED_COLORS = ["#ef4444", "#f59e0b", "#22c55e", "#3b82f6", "#a855f7", "#111827", "#ffffff"];
+let ED = null;
+
+function edLoadImage(src) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => res(img);
+    img.onerror = () => rej(new Error("image decode failed"));
+    img.src = src;
+  });
+}
+
+function edClamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
+
+function openImageEditor(att) {
+  if (!att?.dataUrl) return;
+  closeImageEditor();
+  const base = document.createElement("canvas");
+  const view = h("canvas", { class: "ca-editor-canvas" });
+  const state = {
+    att, base, view, tool: "draw", color: ED_COLORS[0], size: 10, text: "",
+    drawing: false, last: null, start: null, crop: null,
+    history: [], future: [], original: "", dirty: false,
+  };
+  ED = state;
+  const baseCtx = () => state.base.getContext("2d");
+  const hint = h("span", { class: "ca-editor-hint" });
+  const colorWrap = h("div", { class: "ca-editor-swatches" },
+    ED_COLORS.map((c) => h("button", {
+      class: "ca-editor-swatch", title: c, style: { background: c },
+      onClick: (e) => { state.color = c; for (const b of colorWrap.children) b.classList.toggle("on", b === e.currentTarget); },
+    })));
+  colorWrap.firstChild?.classList.add("on");
+  const sizeVal = h("span", { class: "ca-editor-size-val" }, String(state.size));
+  const sizeInput = h("input", { type: "range", min: "2", max: "64", step: "1", value: String(state.size), class: "ca-editor-range" });
+  sizeInput.addEventListener("input", () => { state.size = Number(sizeInput.value) || 10; sizeVal.textContent = String(state.size); });
+  const sizeWrap = h("label", { class: "ca-editor-size" }, h("span", {}, t("edSize")), sizeInput, sizeVal);
+  const textInput = h("input", { class: "ca-editor-text", placeholder: t("edTextPlaceholder") });
+  textInput.addEventListener("input", () => { state.text = textInput.value; });
+  const textWrap = h("label", { class: "ca-editor-textrow" }, textInput);
+
+  const undoBtn = h("button", { class: "ca-icon-btn sm", title: t("undo"), onClick: () => edUndo() }, icon("undo"));
+  const redoBtn = h("button", { class: "ca-icon-btn sm", title: t("edRedo"), onClick: () => edRedo() }, icon("redo"));
+  const toolBtn = (id, ic, label) => h("button", {
+    class: "ca-editor-tool", "data-tool": id,
+    onClick: () => edSetTool(id),
+  }, icon(ic), h("span", {}, label));
+  const drawBtn = toolBtn("draw", "pencil", t("edDraw"));
+  const cropBtn = toolBtn("crop", "crop", t("edCrop"));
+  const textBtn = toolBtn("text", "font", t("edText"));
+  const cropApply = h("button", { class: "ca-btn-sm", hidden: true, onClick: () => edApplyCrop() }, icon("crop"), t("edCropApply"));
+  const rotateL = h("button", { class: "ca-icon-btn sm", title: t("edRotateLeft"), onClick: () => edRotate(-1) }, icon("refresh"));
+  rotateL.style.transform = "scaleX(-1)";
+  const rotateR = h("button", { class: "ca-icon-btn sm", title: t("edRotateRight"), onClick: () => edRotate(1) }, icon("refresh"));
+  const resetBtn = h("button", { class: "ca-icon-btn sm", title: t("edReset"), onClick: () => edReset() }, icon("trash"));
+
+  const overlay = h("div", { class: "ca-editor-overlay", role: "dialog", "aria-modal": "true" });
+  const closeBtn = h("button", { class: "ca-icon-btn", title: t("close"), onClick: () => closeImageEditor() }, icon("times"));
+  const cancelBtn = h("button", { class: "ca-btn", onClick: () => closeImageEditor() }, t("cancel"));
+  const applyBtn = h("button", { class: "ca-btn primary", onClick: () => edApply() }, icon("check"), t("edApply"));
+  overlay.append(h("div", { class: "ca-editor" },
+    h("div", { class: "ca-editor-head" }, h("span", { class: "ca-editor-title" }, t("edTitle")), closeBtn),
+    h("div", { class: "ca-editor-stage" }, view),
+    h("div", { class: "ca-editor-tools" },
+      h("div", { class: "ca-editor-group" }, drawBtn, cropBtn, textBtn, cropApply,
+        h("span", { class: "ca-grow" }), rotateL, rotateR, undoBtn, redoBtn, resetBtn),
+      h("div", { class: "ca-editor-group" }, sizeWrap, colorWrap),
+      textWrap),
+    h("div", { class: "ca-editor-foot" }, hint, h("span", { class: "ca-grow" }), cancelBtn, applyBtn)));
+  state.overlay = overlay;
+
+  const edSetToolInternal = (id) => {
+    state.tool = id;
+    state.crop = null;
+    for (const b of [drawBtn, cropBtn, textBtn]) b.classList.toggle("on", b.dataset.tool === id);
+    textWrap.hidden = id !== "text";
+    sizeWrap.hidden = id === "crop";
+    colorWrap.hidden = id === "crop";
+    edUpdate();
+    if (id === "text") setTimeout(() => textInput.focus(), 30);
+  };
+  state.setTool = edSetToolInternal;
+  state.undoBtn = undoBtn; state.redoBtn = redoBtn; state.cropApply = cropApply;
+  state.hint = hint;
+
+  const pos = (e) => {
+    const r = view.getBoundingClientRect();
+    return {
+      x: edClamp((e.clientX - r.left) * (base.width / Math.max(1, r.width)), 0, base.width),
+      y: edClamp((e.clientY - r.top) * (base.height / Math.max(1, r.height)), 0, base.height),
+    };
+  };
+  const dot = (p) => {
+    const g = baseCtx();
+    g.fillStyle = state.color;
+    g.beginPath(); g.arc(p.x, p.y, state.size / 2, 0, Math.PI * 2); g.fill();
+  };
+
+  view.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    const p = pos(e);
+    view.setPointerCapture(e.pointerId);
+    if (state.tool === "draw") {
+      edPushHistory();
+      state.drawing = true; state.last = p; dot(p); edDrawView();
+    } else if (state.tool === "crop") {
+      state.start = p; state.crop = { x: p.x, y: p.y, w: 0, h: 0 }; edDrawView();
+    } else if (state.tool === "text") {
+      const text = (textInput.value || "").trim();
+      if (!text) { hint.textContent = t("edTextEmpty"); textInput.focus(); return; }
+      edPushHistory();
+      edDrawText(baseCtx(), text, p.x, p.y);
+      state.dirty = true; edDrawView();
+    }
+  });
+  view.addEventListener("pointermove", (e) => {
+    if (!state.drawing && !state.start) return;
+    const p = pos(e);
+    if (state.drawing) {
+      const g = baseCtx();
+      g.strokeStyle = state.color; g.lineWidth = state.size; g.lineCap = "round"; g.lineJoin = "round";
+      g.beginPath(); g.moveTo(state.last.x, state.last.y); g.lineTo(p.x, p.y); g.stroke();
+      state.last = p; state.dirty = true; edDrawView();
+    } else if (state.tool === "crop" && state.start) {
+      state.crop = {
+        x: Math.min(state.start.x, p.x), y: Math.min(state.start.y, p.y),
+        w: Math.abs(p.x - state.start.x), h: Math.abs(p.y - state.start.y),
+      };
+      edDrawView();
+    }
+  });
+  const endStroke = (e) => {
+    if (state.drawing) { state.drawing = false; state.last = null; }
+    if (state.start) { state.start = null; edUpdate(); }
+    try { view.releasePointerCapture(e.pointerId); } catch {}
+  };
+  view.addEventListener("pointerup", endStroke);
+  view.addEventListener("pointercancel", endStroke);
+
+  const onKey = (e) => {
+    if (e.key === "Escape") { e.preventDefault(); closeImageEditor(); }
+    else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); if (e.shiftKey) edRedo(); else edUndo(); }
+  };
+  document.addEventListener("keydown", onKey);
+  state.onKey = onKey;
+
+  document.body.append(overlay);
+  edLoadImage(att.dataUrl).then((img) => {
+    const sc = Math.min(1, ED_MAX / Math.max(img.naturalWidth, img.naturalHeight));
+    base.width = Math.max(1, Math.round(img.naturalWidth * sc));
+    base.height = Math.max(1, Math.round(img.naturalHeight * sc));
+    baseCtx().drawImage(img, 0, 0, base.width, base.height);
+    view.width = base.width; view.height = base.height;
+    state.original = base.toDataURL("image/jpeg", 0.98);
+    edSetToolInternal("draw");
+    edDrawView();
+  }).catch(() => { closeImageEditor(); flash(t("attSkipped", { n: 1 })); });
+}
+
+function edSetTool(id) { ED?.setTool?.(id); }
+
+function edUpdate() {
+  if (!ED) return;
+  ED.undoBtn.disabled = !ED.history.length;
+  ED.redoBtn.disabled = !ED.future.length;
+  ED.cropApply.hidden = !(ED.tool === "crop" && ED.crop && ED.crop.w >= 4 && ED.crop.h >= 4);
+  ED.hint.textContent = ED.tool === "crop" ? t("edCropHint") : ED.tool === "text" ? t("edTextHint") : t("edDrawHint");
+}
+
+function edDrawView() {
+  if (!ED) return;
+  const { view, base } = ED;
+  const g = view.getContext("2d");
+  g.clearRect(0, 0, view.width, view.height);
+  g.drawImage(base, 0, 0);
+  const c = ED.crop;
+  if (ED.tool === "crop" && c && c.w >= 2 && c.h >= 2) {
+    g.save();
+    g.fillStyle = "rgba(8, 8, 12, 0.55)";
+    g.fillRect(0, 0, view.width, view.height);
+    g.drawImage(base, c.x, c.y, c.w, c.h, c.x, c.y, c.w, c.h);
+    g.strokeStyle = "#ffffff"; g.lineWidth = Math.max(1, view.width / 500);
+    g.setLineDash([6, 4]);
+    g.strokeRect(c.x, c.y, c.w, c.h);
+    g.restore();
+  }
+  edUpdate();
+}
+
+function edSnapshot() {
+  return ED?.base.toDataURL("image/jpeg", 0.98) || "";
+}
+
+function edPushHistory() {
+  if (!ED) return;
+  const snap = edSnapshot();
+  ED.history.push(snap);
+  if (ED.history.length > 12) ED.history.shift();
+  ED.future = [];
+  ED.dirty = true;
+}
+
+async function edRestore(url) {
+  if (!ED) return;
+  try {
+    const img = await edLoadImage(url);
+    ED.base.width = img.naturalWidth; ED.base.height = img.naturalHeight;
+    ED.base.getContext("2d").drawImage(img, 0, 0);
+    ED.view.width = ED.base.width; ED.view.height = ED.base.height;
+    ED.crop = null;
+    ED.dirty = true;
+    edDrawView();
+  } catch {}
+}
+
+function edUndo() {
+  if (!ED || !ED.history.length) return;
+  ED.future.push(edSnapshot());
+  edRestore(ED.history.pop());
+}
+
+function edRedo() {
+  if (!ED || !ED.future.length) return;
+  ED.history.push(edSnapshot());
+  edRestore(ED.future.pop());
+}
+
+function edReset() {
+  if (!ED || !ED.original) return;
+  edPushHistory();
+  edRestore(ED.original);
+}
+
+function edRotate(dir) {
+  if (!ED) return;
+  edPushHistory();
+  const { base } = ED;
+  const tmp = document.createElement("canvas");
+  tmp.width = base.height; tmp.height = base.width;
+  const g = tmp.getContext("2d");
+  if (dir > 0) { g.translate(tmp.width, 0); g.rotate(Math.PI / 2); }
+  else { g.translate(0, tmp.height); g.rotate(-Math.PI / 2); }
+  g.drawImage(base, 0, 0);
+  base.width = tmp.width; base.height = tmp.height;
+  base.getContext("2d").drawImage(tmp, 0, 0);
+  ED.view.width = base.width; ED.view.height = base.height;
+  ED.crop = null; ED.dirty = true;
+  edDrawView();
+}
+
+function edApplyCrop() {
+  if (!ED?.crop) return;
+  const { x, y, w, h } = ED.crop;
+  const sx = Math.round(x), sy = Math.round(y), sw = Math.round(w), sh = Math.round(h);
+  if (sw < 4 || sh < 4) { ED.hint.textContent = t("edCropEmpty"); return; }
+  edPushHistory();
+  const tmp = document.createElement("canvas");
+  tmp.width = sw; tmp.height = sh;
+  tmp.getContext("2d").drawImage(ED.base, sx, sy, sw, sh, 0, 0, sw, sh);
+  ED.base.width = sw; ED.base.height = sh;
+  ED.base.getContext("2d").drawImage(tmp, 0, 0);
+  ED.view.width = sw; ED.view.height = sh;
+  ED.crop = null; ED.dirty = true;
+  edDrawView();
+}
+
+function edDrawText(g, text, x, y) {
+  const size = Math.max(10, ED.size * 2);
+  g.save();
+  g.font = `600 ${size}px Inter, "Segoe UI", system-ui, sans-serif`;
+  g.textBaseline = "top";
+  g.fillStyle = ED.color;
+  g.shadowColor = "rgba(0, 0, 0, 0.45)";
+  g.shadowBlur = Math.max(2, size / 8);
+  const lines = text.split(/\r?\n/).slice(0, 20);
+  lines.forEach((line, i) => g.fillText(line, x, y + i * size * 1.18));
+  g.restore();
+}
+
+function edApply() {
+  if (!ED) return;
+  const { att, base } = ED;
+  if (ED.dirty) {
+    att.dataUrl = base.toDataURL("image/jpeg", 0.9);
+    att.mime = "image/jpeg";
+    const sc = Math.min(1, 64 / Math.max(base.width, base.height));
+    const th = document.createElement("canvas");
+    th.width = Math.max(1, Math.round(base.width * sc));
+    th.height = Math.max(1, Math.round(base.height * sc));
+    th.getContext("2d").drawImage(base, 0, 0, th.width, th.height);
+    att.thumb = th.toDataURL("image/jpeg", 0.8);
+    att.edited = true;
+  }
+  closeImageEditor();
+  renderChips();
+  if (ED === null && att.edited) flash(t("edApplied"));
+}
+
+function closeImageEditor() {
+  if (!ED) return;
+  document.removeEventListener("keydown", ED.onKey);
+  ED.overlay.remove();
+  ED = null;
+}
+
 async function attachFiles(files) {
   let skipped = 0;
   for (const file of files) {
@@ -5711,7 +7011,11 @@ async function attachFiles(files) {
     if (file.size > (ATT_LIMITS[kind] ?? ATT_LIMITS.file)) { skipped++; continue; }
     try {
       if (kind === "image") {
-        S.atts.push({ name: file.name || "image", kind, mime: file.type || "image/jpeg", dataUrl: await blobToDataUrl(file, 1280), thumb: await blobToDataUrl(file, 64) });
+        const dataUrl = await blobToDataUrl(file, 1280);
+        const thumb = await blobToDataUrl(file, 64);
+        let path = "";
+        try { path = await uploadAttachment(file, ""); } catch {}
+        S.atts.push({ name: file.name || "image", kind, mime: file.type || "image/jpeg", dataUrl, thumb, size: file.size, path });
       } else if (kind === "3d") {
         let stored = "";
         try { stored = await uploadAttachment(file, "3d"); } catch {}
@@ -5784,6 +7088,15 @@ function buildRoot() {
 
   ui.updateBar = h("div", { class: "ca-update", hidden: true });
   ui.root = h("div", { class: "ca-root" }, ui.header, ui.updateBar, ui.histMenu, ui.msgs, ui.settings, ui.composer, ui.toast);
+  applyTheme();
+  const relayoutTabs = () => {
+    if (!settingsTabBar?.isConnected) return;
+    const w = settingsTabBar.getBoundingClientRect().width;
+    if (Math.abs(w - settingsTabBarWidth) < 0.5) return;
+    syncSettingsTabs(true);
+  };
+  window.addEventListener("resize", relayoutTabs);
+  if (window.ResizeObserver) new ResizeObserver(relayoutTabs).observe(ui.root);
   ["dragover", "drop"].forEach((ev) => ui.root.addEventListener(ev, (e) => {
     if (![...(e.dataTransfer?.types || [])].includes("Files")) return;
     e.preventDefault();
@@ -5799,12 +7112,14 @@ app.registerExtension({
   name: "crazy.comfy_agent",
   async setup() {
     loadLang();
+    loadTheme();
     const css = document.createElement("link");
     css.rel = "stylesheet";
     css.href = new URL("./agent.css", import.meta.url).href;
     document.head.append(css);
     loadState();
     try { S.cfg = await fj("/crazy_agent/config"); } catch (e) { console.warn("[Agent] config unavailable", e); }
+    try { S.ctxInfo = await fj(`/crazy_agent/model_context?tools_chars=${JSON.stringify(TOOL_DEFS).length}`); } catch (e) { console.warn("[Agent] model context unavailable", e); }
     buildRoot();
     renderAll();
     renderJob();

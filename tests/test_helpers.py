@@ -155,6 +155,25 @@ class ValidationHelpers(unittest.TestCase):
         with self.assertRaises(ag.LLMError):
             ag.normalize_github_repo("justa-name")
 
+    def test_public_download_redirects_are_limited_to_hugging_face(self):
+        for url in (
+            "https://huggingface.co/o/r/resolve/main/m.safetensors",
+            "https://cdn-lfs.huggingface.co/repos/ab/cd/file",
+            "https://cdn-lfs.hf.co/repos/ab/cd/file",
+            "https://cas-bridge.xethub.hf.co/xet-bridge-us/abc",
+        ):
+            with self.subTest(url=url):
+                self.assertEqual(ag.public_download_redirect(url), url)
+        for url in (
+            "http://huggingface.co/o/r/resolve/main/m",
+            "https://evil.example/file",
+            "https://huggingface.co.evil.example/file",
+            "https://user:pass@huggingface.co/file",
+            "https://127.0.0.1/file",
+        ):
+            with self.subTest(url=url), self.assertRaises(ag.LLMError):
+                ag.public_download_redirect(url)
+
     def test_host_is_public_rejects_loopback_and_accepts_ip_literals(self):
         self.assertFalse(ag.host_is_public("127.0.0.1"))
         self.assertFalse(ag.host_is_public("localhost"))
@@ -171,6 +190,24 @@ class ValidationHelpers(unittest.TestCase):
         self.assertLessEqual(len(ag.clean_skill_name("x" * 200)), 48)
 
 
+class PersonaTests(unittest.TestCase):
+    def test_persona_name_sanitizes_and_caps(self):
+        self.assertEqual(ag.persona_name("  Nova \n Light "), "Nova Light")
+        self.assertEqual(ag.persona_name("x" * 80), "x" * 40)
+        self.assertEqual(ag.persona_name("   "), "")
+
+    def test_system_prompt_uses_custom_agent_name(self):
+        text = ag.build_system({"agent_name": "Nova", "user_name": "Толя"}, {"language": "Russian"})
+        self.assertIn("You are Nova", text)
+        self.assertIn("Толя", text)
+        self.assertNotIn("{agent_name}", text)
+
+    def test_system_prompt_defaults_to_comfy_agent(self):
+        text = ag.build_system({}, {})
+        self.assertIn("You are Comfy Agent", text)
+        self.assertNotIn("The user's name is", text)
+
+
 class KnowledgeTests(unittest.TestCase):
     def test_knowledge_base_has_searchable_docs(self):
         docs = ag.knowledge_docs()
@@ -181,6 +218,42 @@ class KnowledgeTests(unittest.TestCase):
         for hit in hits:
             self.assertIn("source", hit)
             self.assertIn("text", hit)
+
+    def test_knowledge_maps_jobs_to_native_node_names(self):
+        hits = ag.knowledge_search("load 3d model node", 4)
+        self.assertTrue(hits)
+        text = " ".join(h["text"] for h in hits)
+        self.assertIn("Load3D", text)
+        self.assertIn("Load 3D & Animation", text)
+
+    def test_knowledge_doc_lists_node_purposes(self):
+        docs = ag.knowledge_docs()
+        files = {d["file"] for d in docs}
+        self.assertIn("nodes.md", files)
+        nodes = [d for d in docs if d["file"] == "nodes.md"]
+        body = " ".join(d["text"] for d in nodes)
+        for name in ["LoadImage", "KSampler", "CheckpointLoaderSimple", "SaveImage"]:
+            self.assertIn(name, body)
+
+
+class CompatibilityTests(unittest.TestCase):
+    def test_report_has_backend_and_frontend_capabilities(self):
+        report = ag.compatibility_report()
+        self.assertIn("checks", report)
+        self.assertTrue(report["checks"])
+        ids = {c["id"] for c in report["checks"]}
+        for cid in ("python", "folder_paths", "server", "nodes", "extension", "aiohttp"):
+            self.assertIn(cid, ids)
+        for check in report["checks"]:
+            self.assertIn(check["level"], ("ok", "warn", "fail"))
+            self.assertIsInstance(check["ok"], bool)
+            self.assertTrue(check["name"])
+        python = next(c for c in report["checks"] if c["id"] == "python")
+        self.assertEqual(python["level"], "ok")
+        extension = next(c for c in report["checks"] if c["id"] == "extension")
+        self.assertEqual(extension["level"], "ok")
+        self.assertEqual(report["failed"], sum(1 for c in report["checks"] if c["level"] == "fail"))
+        self.assertEqual(report["ok"], report["failed"] == 0)
 
 
 class DownloadTests(unittest.TestCase):
@@ -300,6 +373,139 @@ class FolderTests(unittest.TestCase):
             self.assertTrue(os.path.isdir(os.path.join(base, "Pack")))
         finally:
             agent_server.custom_nodes_dirs = original
+
+
+class PreflightTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.base = os.path.join(self.tmp.name, "custom_nodes")
+        os.makedirs(self.base)
+        self.original_dirs = ag.custom_nodes_dirs
+        ag.custom_nodes_dirs = lambda: [self.base]
+        ag.PACK_CLASS_CACHE.clear()
+
+    def tearDown(self):
+        ag.custom_nodes_dirs = self.original_dirs
+        ag.PACK_CLASS_CACHE.clear()
+        sys.modules.pop("nodes", None)
+        self.tmp.cleanup()
+
+    def write_pack(self, folder, classes, disabled=False):
+        path = os.path.join(self.base, folder + (".disabled" if disabled else ""))
+        os.makedirs(path, exist_ok=True)
+        mapping = ",\n".join(f'    "{c}": object' for c in classes)
+        with open(os.path.join(path, "__init__.py"), "w", encoding="utf-8") as f:
+            f.write("NODE_CLASS_MAPPINGS = {\n" + mapping + "\n}\n")
+
+    def test_preflight_classifies_node_types(self):
+        self.write_pack("GoodPack", ["PackNode"])
+        self.write_pack("OffPack", ["DisabledNode"], disabled=True)
+
+        class KSampler:
+            MODULE = ""
+
+        fake = types.ModuleType("nodes")
+        fake.NODE_CLASS_MAPPINGS = {"KSampler": KSampler}
+        sys.modules["nodes"] = fake
+
+        rows = {
+            r["type"]: r
+            for r in ag.preflight_nodes(
+                ["KSampler", "PackNode", "DisabledNode", "FaceDetailer", "TotallyUnknown"]
+            )
+        }
+        self.assertEqual(rows["KSampler"]["state"], "loaded")
+        self.assertEqual(rows["PackNode"]["state"], "import_error")
+        self.assertEqual(rows["PackNode"]["pack"], "GoodPack")
+        self.assertEqual(rows["DisabledNode"]["state"], "pack_disabled")
+        self.assertEqual(rows["FaceDetailer"]["state"], "missing_pack")
+        self.assertEqual(rows["FaceDetailer"]["repo"], "ltdrdata/ComfyUI-Impact-Pack")
+        self.assertEqual(rows["TotallyUnknown"]["state"], "unknown_class")
+
+    def test_known_pack_repo_matches_prefix(self):
+        self.assertEqual(ag.known_pack_repo("VHS_VideoCombine"), "Kosinkadink/ComfyUI-VideoHelperSuite")
+        self.assertEqual(ag.known_pack_repo("TotallyUnknown"), "")
+
+
+class ContextBudgetTests(unittest.TestCase):
+    def messages(self, images=0, text="hello"):
+        content = [{"type": "text", "text": text}]
+        for i in range(images):
+            content.append({"type": "image", "data_url": "data:image/png;base64,AAAA"})
+        return [{"role": "user", "content": content}]
+
+    def test_estimate_counts_text_tools_and_images(self):
+        plain = ag.estimate_prompt_tokens("sys", [{"role": "user", "content": "abc"}], [])
+        self.assertGreater(plain, 0)
+        with_img = ag.estimate_prompt_tokens("sys", self.messages(images=2), [])
+        self.assertGreaterEqual(with_img - plain, 5000)
+
+    def test_fit_context_keeps_messages_that_fit(self):
+        msgs = self.messages(images=1)
+        kept, over = ag.fit_context(msgs, [], "sys", 100000)
+        self.assertEqual(len(kept), 1)
+        self.assertLessEqual(over, 100000)
+
+    def test_fit_context_strips_older_images_when_over_budget(self):
+        msgs = [
+            {"role": "user", "content": [{"type": "image", "data_url": "data:image/png;base64,AAAA"}]},
+            {"role": "assistant", "content": "ok"},
+            {"role": "user", "content": [{"type": "image", "data_url": "data:image/png;base64,BBBB"}]},
+        ]
+        kept, over = ag.fit_context(msgs, [], "sys", 6000)
+        self.assertLessEqual(over, 6000)
+        images = [p for m in kept for p in (m["content"] if isinstance(m["content"], list) else []) if p.get("type") == "image"]
+        self.assertEqual(len(images), 1)
+        self.assertEqual(images[0]["data_url"].endswith("BBBB"), True)
+
+    def test_fit_context_without_limit_returns_input(self):
+        msgs = self.messages(images=3)
+        kept, over = ag.fit_context(msgs, [], "sys", 0)
+        self.assertEqual(kept, msgs)
+        self.assertEqual(over, 0)
+
+    def test_strip_images_keeps_last_images_only(self):
+        msgs = [
+            {"role": "user", "content": [{"type": "image", "data_url": "a"}, {"type": "text", "text": "t"}]},
+            {"role": "user", "content": [{"type": "image", "data_url": "b"}]},
+        ]
+        out = ag.strip_images(msgs, 1)
+        images = [p for m in out for p in (m["content"] if isinstance(m["content"], list) else []) if p.get("type") == "image"]
+        self.assertEqual(len(images), 1)
+        self.assertEqual(images[0]["data_url"], "b")
+
+    def test_fit_context_trims_old_turns_when_budget_is_small(self):
+        msgs = [{"role": "user", "content": "the goal"}]
+        for i in range(20):
+            msgs.append({"role": "assistant", "content": "reply %d " % i + "x" * 400})
+            msgs.append({"role": "user", "content": "question %d " % i + "y" * 400})
+        kept, over = ag.fit_context(msgs, [], "sys", 1200)
+        self.assertLess(over, 1200)
+        self.assertLess(len(kept), len(msgs))
+        self.assertEqual(kept[0]["content"], "the goal")
+        self.assertEqual(kept[-1]["content"], msgs[-1]["content"])
+
+    def test_trim_history_drops_orphan_tool_messages(self):
+        msgs = [
+            {"role": "user", "content": "goal"},
+            {"role": "assistant", "content": "", "tool_calls": [{"id": "c1", "function": {"name": "x", "arguments": "{}"}}]},
+            {"role": "tool", "tool_call_id": "c1", "content": "result"},
+            {"role": "user", "content": "next"},
+        ]
+        trimmed = ag.trim_history(msgs, 1)
+        roles = [m["role"] for m in trimmed]
+        self.assertNotIn("tool", roles)
+        self.assertEqual(trimmed[0]["content"], "goal")
+
+    def test_trim_history_cancels_unanswered_tool_calls(self):
+        msgs = [
+            {"role": "user", "content": "goal"},
+            {"role": "assistant", "content": "", "tool_calls": [{"id": "c1", "function": {"name": "x", "arguments": "{}"}}]},
+            {"role": "user", "content": "next"},
+        ]
+        trimmed = ag.trim_history(msgs, 2)
+        ids = [m.get("tool_call_id") for m in trimmed if m["role"] == "tool"]
+        self.assertIn("c1", ids)
 
 
 if __name__ == "__main__":

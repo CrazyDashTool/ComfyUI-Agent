@@ -19,6 +19,9 @@ An in-app AI agent for ComfyUI: a sidebar chat that sees the live canvas, builds
 - Lists, reads and edits subgraphs, converts selected nodes into a subgraph, and moves the canvas view in and out of one.
 - Compares two workflows node by node and applies selected changes as one undoable edit.
 - Works with 3D files: recognises GLB, GLTF, OBJ, FBX, STL, splat and related values on the native Load3D nodes, reads their definitions, and has a curated 3D guide for import, turntable and 3D-to-image setups.
+- Finds the right node by partial words: `find_nodes` matches class names, display names, categories, search aliases, input names and the file names in the loader lists, so "3d", "glb", "loader" or "checkpoint" work. Native nodes rank first and every hit is marked as a full or partial match.
+- Ships a native node reference: the bundled knowledge base maps jobs to the node that does them, including the 3D loader (`Load3D`, shown as **Load 3D & Animation**) and the image loader (`LoadImage`), so the agent stops hunting for a "load glb" node. An empty search tells the model to search again with another word instead of guessing a class name.
+- Reads the graph natively: the canvas context lists every node type with all of its input slots and what is plugged into what, so the agent answers "what does this node need" and "what feeds it" from the graph itself instead of opening media files.
 
 ### Safety and control
 - Every mutating tool runs as a transaction: a failed edit is rolled back automatically, and successful edits get a diff card with **Undo**.
@@ -33,6 +36,7 @@ An in-app AI agent for ComfyUI: a sidebar chat that sees the live canvas, builds
 - Unknown or unfamiliar models are looked up on the official Hugging Face hub instead of guessed.
 - Tool arguments are validated and coerced against JSON schemas; malformed calls are reported back to the model instead of breaking the run.
 - Repeated no-progress tool loops, empty replies and step-limit overruns are detected and stopped with a clear message.
+- Compatibility check in settings: reports the ComfyUI, frontend and Python versions and verifies the backend modules and frontend APIs the panel depends on, with a pass/warning/failure row for each.
 
 ### Models and research
 - Sees the exact open workflow name, purpose, main model files with their roles, sampler, latent size, prompts, open tabs, node count and links.
@@ -57,9 +61,14 @@ An in-app AI agent for ComfyUI: a sidebar chat that sees the live canvas, builds
 - Interactive answer buttons that apply parameter values, open a node on the canvas or jump to the last error.
 - `@` references to nodes, saved/open workflows, past generations (including the graph that produced them) and indexed assets.
 - Attachments by button, paste or drag and drop: images, audio, video (Gemini-compatible endpoints), 3D files and text/JSON files.
+- Attached files are uploaded into the ComfyUI input folder right away (3D files into `input/3d`), and the chat shows the exact path. The agent uses that path as it is in a loader widget or calls `apply_attachment` to drop the file into a node, so an attached photo can be loaded into the workflow without asking the user to upload it again. A **+** button on the file in the chat adds it to the canvas: an image into a Load Image node, a 3D model into a Load 3D node where ComfyUI renders it.
+- Built-in image editor before sending: brush, crop, text with color and size, rotate left/right, undo, redo and reset. Click the thumbnail or the pencil on an image chip; the edited image replaces the attachment.
+- Four panel themes picked from preview cards in settings: **ComfyUI** (follows the ComfyUI colors), **Claude** (warm cream and orange, or the dark clay-grey version), **Luxurious** (gold on ivory or black, with a diamond send button and gold shine) and **Colors** (frosted translucent panels over a soft orange and sage ambient glow). A switch turns the light or dark version of the selected theme on. Both choices are saved in the browser.
+- Agent and user names: choose what the assistant calls itself (shown in the panel title and used in its replies) and how it should address you.
 - Edit any of your messages and resend; the chat context and canvas return to the state before it.
 - Live roadmap card for multi-step tasks with a progress bar and start/done/failed/skipped states.
 - Plan mode: the agent proposes a numbered plan first, then waits for approval, changes or cancellation before editing. It re-checks the plan after important results, asks more often when a choice matters, and compresses long histories while keeping the goal. An approved plan becomes the roadmap automatically.
+- Plan pre-flight: before the plan is shown, every node type the plan needs is checked. The card tells you which nodes are ready, which pack is installed but did not load, which pack still has to be installed and which node name does not exist at all, with installed alternatives for the last case. A plan that needs a new pack is split into "install and restart" and "build the graph".
 - Fast mode is the classic behavior: plan the work internally and act right away.
 - Self-update: on page load the panel checks GitHub, plays a short notification sound and shows a banner when a newer version exists. Automatic fast-forward is optional; ComfyUI is never restarted automatically.
 - Automatic canvas check after every edit: unavailable combo values and missing media files are reported back to the model immediately, so it fixes a broken Load Image instead of claiming success.
@@ -117,9 +126,14 @@ Any OpenAI-compatible endpoint works. Anthropic is supported through its native 
 
 ### Settings reference
 
+The settings panel has three tabs: **AI** (provider, model, limits, permissions and search), **Customization** (language, theme, names and skills) and **Logs** (chat export, server log, performance, extension updates and the compatibility report). Language, theme, names and AI fields are saved with the **Save** button on their tab. The selected tab is marked by a pill that slides over, and the panel content moves in from the side you came from.
+
 | Setting | Default | What it does |
 |---|---|---|
 | Language | English | UI language and the language the agent replies in. |
+| Theme | ComfyUI | Panel appearance: **ComfyUI**, **Claude**, **Luxurious** or **Colors**, picked from preview cards. The switch below sets the light or dark version (the ComfyUI theme keeps ComfyUI's own colors). |
+| Agent name | Comfy Agent | What the assistant calls itself; shown in the header and used in replies. |
+| Your name | — | How the assistant should address you. |
 | Preset | — | Fills the provider and base URL for a known service. |
 | Provider | OpenAI-compatible | OpenAI-compatible API or Anthropic's native API. |
 | Base URL | `https://api.openai.com/v1` | Endpoint of the LLM server. |
@@ -180,6 +194,7 @@ Enabling a provider adds the `web_search` and `read_url` tools. `read_url` allow
 - Plain questions and small talk stay read-only, even when they include `@` references or attachments.
 - Workflow questions are answered from the deterministic canvas summary with the exact workflow name, purpose and model files; a tab name alone is not treated as an answer.
 - In Plan mode the path is re-checked after validation, a run or an error, and `ask_user` is used more often for choices that really matter. An approved plan becomes the roadmap and is updated step by step.
+- In Plan mode the plan card shows a pre-flight for the node types the plan needs: ready, pack installed but not registered, pack missing or node name unknown. Missing packs are installed first and the graph is built after the restart, so a missing custom node no longer breaks the run halfway.
 - In Plan mode a long conversation is compressed before the model call: older messages are summarized into a goal-preserving note while the recent messages stay intact. The chat shows a short note when this happens.
 - Updates are checked with `git fetch` and applied with `git merge --ff-only` on `main` only. The update endpoint accepts requests only from the same machine and requires a custom header; a dirty checkout is never touched.
 
@@ -198,7 +213,7 @@ Tips:
 
 - Type `@` to reference nodes, saved/open workflows or past generations.
 - `Enter` sends; `Shift+Enter` inserts a newline.
-- Paste or drag files onto the composer to attach them. Limits: 6 attachments, images up to 8 MB, video/audio up to 16 MB, 3D files up to 64 MB, text/JSON up to 1 MB, and up to 8 references.
+- Paste or drag files onto the composer to attach them. Limits: 6 attachments, images up to 8 MB, video/audio up to 16 MB, 3D files up to 64 MB, text/JSON up to 1 MB, and up to 8 references. An attached file is uploaded into the ComfyUI input folder at once, and the chip under the message shows its path, so you can ask for it to be loaded into a node.
 - Switch **Plan / Fast** above the send button to choose the agent mode; the **Ask / Auto** switch below it controls run approvals.
 - When the agent asks a question, choose one of the options or type your own answer.
 - Use **Undo** on a canvas change card to return to the graph from before that edit.
@@ -216,7 +231,7 @@ The agent chooses tools through the model's tool-calling interface. Availability
 | Tool | Purpose |
 |---|---|
 | `get_graph` | Read every node, widget value, link and output name. |
-| `find_nodes` | Search installed node types by name, category or description. |
+| `find_nodes` | Search installed node types by partial keywords: class name, display name, category, search aliases, input names or file names. Returns class names with inputs and outputs, marked as a full or partial match. |
 | `get_node_info` | Full node definition: inputs, combo options, defaults, ranges and outputs. |
 | `inspect_node` | Deep-read one node: all widget values, combo samples, every link, flags, groups and definition. |
 | `build_graph` | Create nodes and links in one call. |
@@ -225,6 +240,7 @@ The agent chooses tools through the model's tool-calling interface. Availability
 | `remove_nodes` | Delete nodes by id. |
 | `clear_graph` | Remove everything from the canvas. |
 | `validate_graph` | Check node types, required inputs, model values and output nodes. |
+| `apply_attachment` | Put a file from the chat into a loader widget (`LoadImage.image`, `Load3D.model_file`, …) by node id, or create the matching loader node when no node id is given. |
 
 ### Fast actions
 
@@ -293,7 +309,7 @@ The agent chooses tools through the model's tool-calling interface. Availability
 |---|---|
 | `list_assets` | Search images, video, audio, 3D models and model files across ComfyUI folders. |
 | `inspect_media` | Read image/video/audio/3D metadata and attach a preview frame. |
-| `search_knowledge` | Search the bundled reference on models, samplers, workflows, node packs, errors and 3D. |
+| `search_knowledge` | Search the bundled reference on models, samplers, workflows, native nodes, node packs, errors and 3D. |
 | `download_model` | Download a public Hugging Face file into a models folder (asks first; resumes and verifies SHA-256). |
 | `install_custom_node` | Clone a public GitHub node pack into `custom_nodes` (asks first; restart to load). |
 | `remember` / `list_memory` / `forget_memory` | Manage short project preferences and conventions. |
@@ -357,7 +373,7 @@ python -m unittest discover -s tests -p "test_*.py"
 node tests/check_frontend.mjs
 ```
 
-The backend tests stub ComfyUI's `server` and `folder_paths` modules, so they run without a ComfyUI process.
+The backend tests stub ComfyUI's `server` and `folder_paths` modules, so they run without a ComfyUI process. The frontend check also verifies the theme cards, previews and light/dark lever against the stylesheet and i18n, the image editor entry points, the attachment and loader functions and the security markers in the backend (download redirect allowlist, atomic node clone).
 
 ### Backend API
 
@@ -377,6 +393,8 @@ The backend tests stub ComfyUI's `server` and `folder_paths` modules, so they ru
 | `GET /crazy_agent/assets` | Search the local asset index by kind, folder and keywords. |
 | `GET /crazy_agent/knowledge` | List or search the bundled knowledge base. |
 | `GET /crazy_agent/environment` | Python, PyTorch, CUDA, GPU, disk and package diagnostics. |
+| `GET /crazy_agent/compatibility` | ComfyUI, frontend and Python versions plus backend dependency checks. |
+| `GET /crazy_agent/model_context` | The provider's loaded and maximum context window for the current model. |
 | `GET /crazy_agent/model_info` | Model file size, metadata and safetensors header summary. |
 | `GET /crazy_agent/custom_nodes` | List installed and disabled custom-node packs. |
 | `POST /crazy_agent/custom_node_toggle` | Enable or disable a pack by renaming its folder (loopback and custom header only). |
@@ -393,6 +411,7 @@ The backend tests stub ComfyUI's `server` and `folder_paths` modules, so they ru
 
 - Beta software: expect rough edges, especially with small local models.
 - Answer quality depends heavily on the model. A model with reliable tool calling is required; vision is needed for the agent to actually see images.
+- The context window is the limit for everything: tool schemas, the system prompt, the conversation and the images. The panel reads the model's loaded context window, keeps the last two images, counts images in the context budget, and drops older images when the model answers with an empty reply instead of failing. When a request does not fit, the backend trims the oldest turns, and the panel compacts the conversation and retries; only if that is still not enough it answers with the required and available token counts instead of a silent error.
 - The canvas snapshot shows the top level of a workflow; nested subgraphs are available through the subgraph tools.
 - Undo of the last three canvas edits survives a reload; older diff cards and message rollback rely on in-memory snapshots and stop working after a reload. Very large graphs skip persistent snapshots when they exceed the storage cap.
 - Workflow versions and project memory are stored in the browser, not on disk, so they do not sync between browsers or machines.
@@ -401,9 +420,9 @@ The backend tests stub ComfyUI's `server` and `folder_paths` modules, so they ru
 - Private or gated Hugging Face repositories may not return a README without authentication.
 - Web search is off by default; model lookup still works without it.
 - Self-update works only for a git checkout of `main`, only from the panel on the machine that runs ComfyUI, and only while the folder has no tracked local changes. Restart ComfyUI afterwards to load backend changes.
-- Asset search, knowledge search, model downloads and node installs are new backend routes: after updating the extension, restart ComfyUI once to activate them.
-- Downloads are limited to public `huggingface.co` / `hf.co` resolve URLs. Gated repositories need their token configured outside the agent.
-- Node installs only clone the repository. Python requirements are reported to the model but are not installed automatically.
+- Asset search, knowledge search, model downloads, node installs and the compatibility check are backend routes: after updating the extension, restart ComfyUI once to activate them.
+- Downloads are limited to public `huggingface.co` / `hf.co` resolve URLs. Redirects are checked hop by hop against the Hugging Face CDN hosts, and redirects to any other host are refused. Gated repositories need their token configured outside the agent.
+- Node installs clone into a temporary folder and move it into `custom_nodes` only after a successful clone. Submodules and tags are not fetched, branch names are validated, and Python requirements are reported but not installed automatically.
 
 ## Troubleshooting
 
@@ -412,6 +431,7 @@ The backend tests stub ComfyUI's `server` and `folder_paths` modules, so they ru
 - **Model lookup returns no repository**: pass the exact repo id (`owner/name`) or another spelling; not every local filename exists on Hugging Face.
 - **Run is blocked**: switch from `Ask` to `Auto`, or approve the pending action in the chat.
 - **`list_assets` or `search_knowledge` fails with 404**: restart ComfyUI so the new backend routes load, then reload the page.
+- **The compatibility check reports a missing backend route**: restart ComfyUI once and run the check again; the panel itself keeps working.
 - **The agent stopped instead of editing a node you changed**: this is the co-work guard. Send "continue" after your change; the agent re-reads the canvas and applies its edit only where it does not conflict.
 - **Update is skipped**: the checkout has tracked local changes, the branch is not `main`, or the panel is not opened on the machine running ComfyUI. Commit or discard the changes and check again from settings.
 - **An edit was rolled back**: read the error note in the chat, then ask the agent to fix the cause and retry.
