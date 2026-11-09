@@ -1,27 +1,33 @@
 # Changelog
 
-## 0.4.8 — 2026-11-04
+## 0.4.9 — 2026-11-09
 
 ### Added
 
-- Themes in settings as preview cards: **ComfyUI** (the existing look), **Claude** (warm cream with an orange accent, or the dark clay-grey version from the reference), **Luxurious** (gold on ivory or black, with a diamond-shaped send button, gold shine on primary buttons and a gem on user messages) and **Colors** (frosted transparent panels with pill-shaped controls over a drifting orange and sage glow). A switch below the cards sets the light or dark version of the selected theme; the ComfyUI theme keeps ComfyUI's own colors. Both choices are saved in the browser.
-- Agent and user names in settings: the assistant's name replaces the header title and is used in its replies, and the user name tells the assistant how to address you. Both names are stored in the local config.
-- Settings are split into three tabs: **AI** (provider, model, limits, permissions, search), **Customization** (language, themes, names, skills) and **Logs** (chat export, server log, performance, extension updates and compatibility). The active tab is marked by a pill that slides to the new position, and the panel content slides in from the direction of the switch.
-- The panel opens with a smooth fade, slide and scale, and the chat and settings views rise into place instead of snapping.
-- Image editor before sending: click the pencil on an image attachment to draw, crop, add text, rotate left/right, undo/redo and reset, then apply the result back to the attachment. Works with mouse, touch and pen; Escape and Ctrl+Z / Ctrl+Shift+Z are supported.
-- Compatibility report: a new **Compatibility** block in settings plus the `GET /crazy_agent/compatibility` route check Python, aiohttp, PyTorch, the ComfyUI version, the frontend build, extension files, model folders and the browser-side APIs (`app.graph`, `graphToPrompt`, `queuePrompt`, sidebar, workflow manager, LiteGraph, viewport), and flag every item as ok, warning or failure.
-- Plan pre-flight: in Plan mode every node type the plan needs is checked before the plan is shown. The plan card marks each one as ready, pack installed but not registered, pack missing or node name unknown, and offers installed alternatives for the unknown ones. A plan that needs a new pack is split into a setup phase (install or enable the pack, restart ComfyUI) and a build phase, and the roadmap starts with the setup steps.
-- Attached files become real files: an image or 3D file added in the chat is uploaded into the ComfyUI input folder (3D files into `input/3d`) right away, and the chat shows the exact path under the file.
-- New `apply_attachment` tool puts an attached file into a loader widget by node id, so an attached photo can be loaded into the workflow without a manual upload. Called without a node id it creates the matching loader node (Load Image for an image, Load 3D for a 3D file), and it reuses a loader that already holds the file instead of adding a second one.
-- A "+" button on an attached file in the chat adds the file to the canvas with one click: an image goes into a Load Image node and a 3D model into a Load 3D node, where ComfyUI renders it.
-- The canvas context now lists every node type with all of its input slots, connected or not, plus what is plugged into which slot. The agent reads the graph from those blocks instead of opening media files.
-- Context window handling: the panel keeps the last two images and counts images in the context budget, the backend measures the prompt against the model's loaded context window, and a new `GET /crazy_agent/model_context` route reports that window.
-- Node search by partial words: `find_nodes` matches class names, display names, categories, the search aliases ComfyUI ships, input names and the file names in the loader lists, so "3d", "glb", "loader" or "checkpoint" find something. Native nodes rank first, every hit says whether it is a full or a partial match, and a query with no hit returns the closest node names instead of a dead end.
-- A native node reference in the bundled knowledge base (`knowledge/nodes.md`): it maps jobs to the node that does them, including the 3D loader (`Load3D`, shown as **Load 3D & Animation**), the image loader (`LoadImage`), checkpoint, sampler, latent, conditioning, image editing and output nodes.
-- Context overflow recovery: when a request does not fit the loaded context window, the backend trims the oldest turns instead of only dropping images, and the panel summarizes the conversation and retries.
+- **ComfyUI MCP Bridge**: Official ComfyUI MCP (`comfy.org/mcp`, package `comfy-mcp`) integrated directly as the agent bridge to ComfyUI canvas and execution. Added `/crazy_agent/mcp/status`, `/crazy_agent/mcp/tools`, `/crazy_agent/mcp/call`, and `/crazy_agent/mcp/install` routes.
+- **First Startup Wizard**: Interactive 4-step modal onboarding on first launch:
+  1. Theme selection (themes grid, dark/light mode toggle, and interface language).
+  2. Provider & Model setup (preset picker, base URL, API key, model loader, vision toggle).
+  3. Personas setup (Agent name and User address name).
+  4. ComfyUI MCP verification and one-click installer (mandatory step ensuring `comfy-mcp` bridge is ready).
+- **llama.cpp Provider**: Added dedicated `llamacpp` provider and local preset (`http://127.0.0.1:8080/v1`). Queries `n_ctx` from llama.cpp server `/props` automatically for context budgeting.
+- **Multimodal Audio and Video for llama.cpp**:
+  - Full support for video input (`video_url`) and audio input (`input_audio`) when provider is `llamacpp` and the model supports multimodal capabilities.
+  - Automatic modality detection from model architecture/name (e.g., Qwen2-VL, Qwen2.5-VL, MiniCPM-V, Gemma-3, Qwen2-Audio, Whisper, Omni) and `/props` modalities.
+  - Informative notifications when a text-only model is used with video/audio attachments.
+  - Video thumbnail generation and automatic file uploads to the ComfyUI input directory.
+- Model readiness check: the new `check_model_setup` tool looks at a model before it is used. It reports the parts of the family (diffusion model, text encoders, VAE), which of them are installed in the ComfyUI model folders, which are missing, the loader node and the models folder for each part, and the prompt style of the family. The agent calls it before it builds or runs a workflow, so a missing text encoder or VAE is reported instead of a workflow that cannot run.
+- A prompting guide in the bundled knowledge base (`knowledge/model-prompting.md`): how to write a prompt for each family (one coherent paragraph for FLUX and Z-Image, quoted text and layout for Qwen-Image, a direct instruction for the editors, no negative prompt where the sampler ignores it) and which family fits which task.
+- Batch generation: `generate` and `run_workflow` take a `batch` of 1-8 shots, and `create_workflow` sets the `batch_size` of the latent node. When the workflow has a latent node the shots run as one batch, otherwise several prompts are queued with consecutive seeds. The job bar shows how many shots are done, and the result lists every file.
+- Smooth node appearance: nodes the agent creates now fade and scale in on the canvas instead of popping up, with a short stagger so a batch of new nodes arrives one after another.
 
 ### Changed
 
+- The change highlight no longer repaints the node. Created and changed nodes get a pulsing outline instead, and the color of that outline comes from the active panel theme: green for a new node, amber for a changed one and the theme accent for the rest. The node keeps its own title and body colors, so the graph stays readable and a saved workflow is not affected.
+- Negative prompts that have no field on canvas are safely skipped without failing generation runs.
+- Thought signature persistence and reply support for Gemini 3 / Google AI Studio models.
+
+## 0.4.8 — 2026-11-04
 - The frosted theme is called **Colors** now; a browser that still had the old name stored keeps the same look, the saved value is migrated automatically.
 - Model downloads follow Hugging Face redirects manually and validate every hop: only HTTPS, no embedded credentials and only the `huggingface.co` / `hf.co` hosts plus their known CDN hosts. Checksum, resume, disk-space and no-overwrite behaviour is unchanged.
 - Node installation is stricter: repository names cannot start with `.` or `-`, the branch is validated, clones run with `--depth 1 --single-branch --no-tags --no-recurse-submodules` and without prompts, and the checkout is staged in a hidden folder and moved into place only after it succeeds.
@@ -36,6 +42,7 @@
 - The system prompt names the node for each job and forbids guessing class names: there is no "load glb" node, the 3D loader is `Load3D` ("Load 3D & Animation"), and an empty search means searching again with another word.
 - After a node search that found nothing, the agent is asked to search again with a shorter word instead of answering with a made-up class name.
 - The panel reads the real loaded context window from the backend and compacts the conversation earlier, instead of relying on a fixed character budget.
+- The system prompt now asks the model to check the model first (parts, missing files, loader nodes, prompt style) and to use the batch parameter instead of queueing several runs by hand.
 
 ### Notes
 
@@ -43,6 +50,14 @@
 - The pre-flight route needs a ComfyUI restart as well. Until then the plan card is shown without the availability check.
 - The context window check, the `model_context` route and the token-aware trimming need a ComfyUI restart. The partial node search, the retry after an empty search, the image drop and the empty-reply rescue work in the browser without it.
 - Undo history in the image editor is kept in memory for the open editor only.
+- The node appearance animation and the themed outline are frontend changes and work after a page reload; no ComfyUI restart is needed.
+
+### Fixed
+
+- A negative prompt with no place on the canvas no longer breaks the run. `set_prompt` used to fail when the workflow had no negative prompt field, so `generate` never produced an image and the agent called it again and again with the same negative prompt. The negative prompt is now skipped with a note that tells the agent to leave it out or to add a text node for it, the positive prompt is still applied and the generation goes through.
+- The system prompt now says what to do when there is no negative prompt field: do not call the tool again with the same negative prompt, either drop it (many models ignore it, especially at CFG 1) or add a text node and link it to the sampler's negative input.
+- Google AI Studio no longer rejects a tool call with "Function call is missing a thought_signature in functionCall parts". The Gemini thought signature is read from the response and sent back with the function call, in the same `extra_content.google.thought_signature` shape the API expects.
+- Tool calls that arrive without an `index` (the Gemini compatibility layer often omits it) no longer merge into a single call, so parallel tool calls stay separate.
 
 ## 0.4.7 — 2026-11-03
 

@@ -979,6 +979,30 @@
   25% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--ca-accent) 34%, transparent); border-radius: 10px; }
 }
 
+.ca-fx-node {
+  position: absolute;
+  pointer-events: none;
+  box-sizing: border-box;
+  border-radius: 12px;
+  border: 2px solid var(--ca-fx-color, #6d9cff);
+  opacity: 0;
+  z-index: 9999;
+}
+.ca-fx-node.ca-fx-pulse { animation: ca-fx-pulse 1.7s ease-in-out infinite; }
+@keyframes ca-fx-pulse {
+  0%, 100% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--ca-fx-color) 45%, transparent), 0 0 8px color-mix(in srgb, var(--ca-fx-color) 30%, transparent); }
+  50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--ca-fx-color) 25%, transparent), 0 0 24px 6px color-mix(in srgb, var(--ca-fx-color) 45%, transparent); }
+}
+.ca-fx-node.ca-fx-ring { animation: ca-fx-ring 760ms cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+@keyframes ca-fx-ring {
+  from { opacity: 0.95; box-shadow: 0 0 24px 2px color-mix(in srgb, var(--ca-fx-color) 55%, transparent); }
+  to { opacity: 0; box-shadow: 0 0 6px color-mix(in srgb, var(--ca-fx-color) 12%, transparent); }
+}
+.ca-fx-node.ca-fx-static { animation: none; box-shadow: 0 0 0 2px color-mix(in srgb, var(--ca-fx-color) 60%, transparent); }
+@media (prefers-reduced-motion: reduce) {
+  .ca-fx-node { animation: none !important; }
+}
+
 .ca-runstats { border: 1px solid var(--ca-border); border-radius: 10px; background: var(--ca-surface); overflow: hidden; }
 .ca-runstats > summary { display: flex; align-items: center; gap: 8px; padding: 8px 11px; cursor: pointer; list-style: none; font-size: 12px; }
 .ca-runstats > summary::-webkit-details-marker { display: none; }
@@ -1091,3 +1115,86 @@
 .ca-compat-state.ok { color: var(--ca-ok); }
 .ca-compat-state.warn { color: var(--ca-warn); }
 .ca-compat-state.fail { color: var(--ca-bad); }
+
+/* First Start Up Wizard */
+.ca-wizard-overlay {
+  position: absolute; inset: 0; z-index: 100;
+  display: flex; flex-direction: column;
+  background: var(--ca-bg); color: var(--ca-fg);
+  overflow-y: auto; padding: 20px 16px;
+  animation: ca-rise 0.28s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+.ca-wizard-header {
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  margin-bottom: 16px;
+}
+.ca-wizard-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; font-size: 11px; font-weight: 700;
+  letter-spacing: 0.05em; text-transform: uppercase;
+  border-radius: 20px; background: var(--ca-surface);
+  border: 1px solid var(--ca-border); color: var(--ca-accent);
+  margin-bottom: 8px;
+}
+.ca-wizard-title {
+  font-size: 18px; font-weight: 700; margin-bottom: 4px;
+}
+.ca-wizard-sub {
+  font-size: 12px; color: var(--ca-dim); max-width: 440px; line-height: 1.4;
+}
+.ca-wizard-steps-bar {
+  display: flex; align-items: center; justify-content: center;
+  flex-wrap: wrap; gap: 6px; margin: 12px 0 18px;
+}
+.ca-wizard-step-dot {
+  display: flex; align-items: center; gap: 5px;
+  padding: 5px 10px; border-radius: 16px; font-size: 11px; font-weight: 600;
+  background: var(--ca-surface); border: 1px solid var(--ca-border);
+  color: var(--ca-dim); cursor: pointer; transition: all 0.2s;
+}
+.ca-wizard-step-dot.active {
+  background: var(--ca-btn-bg); color: var(--ca-btn-fg);
+  border-color: var(--ca-btn-bg);
+}
+.ca-wizard-step-dot.done {
+  border-color: var(--ca-ok); color: var(--ca-ok);
+}
+.ca-wizard-card {
+  background: var(--ca-surface); border: 1px solid var(--ca-border);
+  border-radius: 10px; padding: 16px 14px; margin-bottom: 16px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.ca-wizard-card-title {
+  font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px;
+}
+.ca-wizard-card-sub {
+  font-size: 12px; color: var(--ca-dim); line-height: 1.4;
+}
+.ca-wizard-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: auto; padding-top: 14px; border-top: 1px solid var(--ca-border);
+}
+.ca-mcp-status-box {
+  padding: 12px; border-radius: 8px; border: 1px solid var(--ca-border);
+  display: flex; flex-direction: column; gap: 6px; font-size: 13px;
+}
+.ca-mcp-status-box.ready {
+  background: rgba(34, 197, 94, 0.08); border-color: rgba(34, 197, 94, 0.35);
+  color: var(--ca-ok);
+}
+.ca-mcp-status-box.missing {
+  background: rgba(239, 68, 68, 0.08); border-color: rgba(239, 68, 68, 0.35);
+  color: var(--ca-bad);
+}
+.ca-mcp-status-box.installing {
+  background: rgba(59, 130, 246, 0.08); border-color: rgba(59, 130, 246, 0.35);
+  color: var(--ca-accent);
+}
+.ca-mcp-tools-list {
+  display: flex; flex-wrap: wrap; gap: 4px; max-height: 120px; overflow-y: auto;
+  padding: 6px; background: var(--ca-bg); border-radius: 6px; border: 1px solid var(--ca-border);
+}
+.ca-mcp-tool-pill {
+  font-size: 11px; padding: 2px 7px; border-radius: 4px;
+  background: var(--ca-chip-bg, var(--ca-surface)); color: var(--ca-fg); font-family: monospace;
+}

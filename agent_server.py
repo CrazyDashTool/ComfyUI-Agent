@@ -30,11 +30,72 @@ HF_DOWNLOAD_HOSTS = HF_HOSTS | {
 }
 DOWNLOAD_LOCK = asyncio.Lock()
 
+try:
+    import comfy_mcp.server as comfy_mcp_server
+    import comfy_mcp.instructions as comfy_mcp_instructions
+    MCP_AVAILABLE = True
+    MCP_INSTRUCTIONS = getattr(comfy_mcp_instructions, "INSTRUCTIONS", "")
+except Exception as _mcp_err:
+    comfy_mcp_server = None
+    comfy_mcp_instructions = None
+    MCP_AVAILABLE = False
+    MCP_INSTRUCTIONS = ""
+
+_MCP_TOOLS_CACHE = {"at": 0, "tools": []}
+
+async def get_mcp_tools():
+    if not MCP_AVAILABLE or comfy_mcp_server is None:
+        return []
+    now = time.time()
+    if _MCP_TOOLS_CACHE["tools"] and now - _MCP_TOOLS_CACHE["at"] < 300:
+        return _MCP_TOOLS_CACHE["tools"]
+    try:
+        raw_tools = await comfy_mcp_server.mcp.list_tools()
+        out = []
+        for t in raw_tools:
+            schema = t.input_schema if isinstance(getattr(t, "input_schema", None), dict) else {}
+            out.append({
+                "name": t.name,
+                "description": t.description or "",
+                "parameters": schema
+            })
+        _MCP_TOOLS_CACHE["at"] = now
+        _MCP_TOOLS_CACHE["tools"] = out
+        return out
+    except Exception as e:
+        print(f"[ComfyUI-Agent] error listing MCP tools: {e}")
+        return []
+
+async def call_mcp_tool(name: str, args: dict):
+    if not MCP_AVAILABLE or comfy_mcp_server is None:
+        raise RuntimeError("ComfyUI MCP (comfy_mcp) is not installed or available.")
+    res = await comfy_mcp_server.mcp.call_tool(name, args or {})
+    texts = []
+    images = []
+    if hasattr(res, "content") and res.content:
+        for item in res.content:
+            text = getattr(item, "text", None)
+            if text:
+                texts.append(text)
+            data = getattr(item, "data", None)
+            if data:
+                mime = getattr(item, "mimeType", None) or "image/png"
+                images.append(f"data:{mime};base64,{data}")
+    is_err = bool(getattr(res, "is_error", False))
+    full_text = "\n".join(texts) if texts else ("(ok)" if not is_err else "Tool error")
+    return {
+        "ok": not is_err,
+        "result": full_text,
+        "images": images,
+        "is_error": is_err
+    }
+
 DEFAULTS = {
     "provider": "openai",
     "base_url": "https://api.openai.com/v1",
     "api_key": "",
     "model": "",
+    "bridge": "mcp",
     "max_tokens": 0,
     "temperature": None,
     "vision": True,
@@ -54,6 +115,7 @@ DEFAULTS = {
     "extra_prompt": "",
     "agent_name": "",
     "user_name": "",
+    "onboarded": False,
 }
 
 DEFAULT_AGENT_NAME = "Comfy Agent"
@@ -75,6 +137,9 @@ GOLDEN RULES
 12. Unknown or new models: when a model file, family or repo is unfamiliar, or the user asks what a model is, what it does or how to use it, call model_lookup(name) BEFORE answering or building. It searches the official Hugging Face hub and returns the repo URL, pipeline, tags, files and a README excerpt. Build and answer from that data, name the repo id, and never guess an architecture from the file name. model_lookup works even when web search is off.
 13. Every canvas edit ends with an automatic canvas check. If a tool result contains "Canvas check found problems", fix them before running or reporting success. Never claim that a file was loaded or a value was set unless the tool result confirms that exact value; tool results show the values actually applied.
 14. The user shares the canvas with you. If a tool result says the user changed nodes while you were working, do not overwrite those nodes: call get_graph, re-read the current values, and re-apply only your intended change.
+15. Before you build or run a workflow for a model, look at the model first: call check_model_setup with the model file name or the family keyword. It answers what the model is made of (diffusion model, text encoders, VAE), which of those files are installed, which are missing, which loader node to use and where a missing file has to go. If a file is missing, tell the user what to download and where, and do not build a workflow that cannot run. Then write the prompt in the style the family expects, from the prompting guide.
+16. When the user asks for several shots, variations or a batch of images, pass batch (1-8) to generate or run_workflow. One shot is the default; never queue several runs by hand and never call the tool repeatedly to get more images.
+17. A negative prompt needs a place on the canvas. If a tool reports that there is no negative prompt field, the negative prompt was skipped: do not call that tool again with the same negative prompt. Either leave it out (many models ignore it, especially at CFG 1) or add a text node and link it to the sampler's negative input, then say what you did.
 
 ROADMAP
 - create_roadmap takes a one-line summary and 2-8 short concrete steps. It is a progress display, not a question: keep working after creating it.
@@ -83,6 +148,8 @@ ROADMAP
 
 RECIPES (follow them exactly)
 - Change the prompt and generate: generate(prompt=...). Or set_prompt(positive=...) and then run_workflow.
+- Negative prompt: pass one only when the canvas has a negative prompt field, a text node linked to the sampler's negative input. When the canvas has none, the tool skips it: do not pass one again and do not retry the call.
+- Several variations of the same prompt at once: generate(prompt=..., batch=4) or run_workflow(batch=4). The batch is 1-8. It uses the native batch_size of the latent node when the workflow has one, and otherwise queues N prompts with consecutive seeds.
 - Make or build a workflow for z-image, flux, qwen-image or SD/SDXL: create_workflow(template=...), then run_workflow if the user wants an image. For anything else: find_nodes, then build_graph.
 - Change a setting (seed, steps, cfg, size, sampler, scheduler): set_param(name, value).
 - Fix errors: when a run fails call diagnose_error first — it names the failing node, the exception and concrete fixes. Validate and fix what it lists, run again, repeat. If it says there is nothing recorded, or the cause is unclear, call get_server_logs (optionally with grep) to read the real traceback.
@@ -98,12 +165,13 @@ RECIPES (follow them exactly)
 - Files on disk (images, video, audio, 3D models, checkpoints, loras): list_assets. Use the exact returned names in loader widgets. Native 3D formats: glb, gltf, obj, fbx, stl, ply, spz, splat.
 - Before editing one node, especially a custom node: inspect_node(id) for every widget value, combo sample, link and definition.
 - ComfyUI model families, samplers, workflow patterns, node packs and common errors: call search_knowledge before guessing. It searches the curated local reference.
+- A model you are about to use: check_model_setup(model) first. It lists the parts of the family (diffusion model, text encoders, VAE), which of them are installed, which are missing, the loader node and the models folder for each part. Then search_knowledge("prompting <family>") for the prompt style of that family before writing the prompt. Never build a workflow with a missing file.
 - A missing model: download_model takes a Hugging Face repo id plus file (or a huggingface.co .../resolve/... URL) and a models folder such as checkpoints, diffusion_models, loras or vae. It asks the user first and never overwrites without permission.
 - A missing custom node pack: install_custom_node clones a public GitHub repo into custom_nodes. It asks the user first; tell them to restart ComfyUI and install the pack requirements if the result lists any.
 - Unknown or new model, or "what is <model>, what does it do, how do I use it": call model_lookup with the file name, repo id or model name first. Answer from the returned official Hugging Face data (pipeline, tags, files, README excerpt) and name the repo id. If it finds nothing, ask for the exact repo id instead of guessing.
 - Which workflow is open, what it does, which models it uses: answer from the CURRENT CANVAS summary (exact name, purpose, main files, output); call get_graph only if a detail is missing. Do not edit anything.
 - Subgraphs (nested graphs): the canvas snapshot shows only the top level, so call list_subgraphs and read_subgraph to see inside. edit_subgraph changes inner widget values, titles, mute/bypass and deletes inner nodes; create_subgraph turns selected canvas nodes into a subgraph; enter_subgraph and exit_subgraph only move the canvas view for the user.
-- Attachments and @references are inside the user message: images, audio, video (video only on Gemini) and text/JSON files wrapped in <file name="...">. Use them. For a generation you get the graph that made it; load_generation_workflow restores it on the canvas.
+- Attachments and @references are inside the user message: images, audio, video (on Gemini and multimodal llama.cpp models) and text/JSON files wrapped in <file name="...">. Use them. For a generation you get the graph that made it; load_generation_workflow restores it on the canvas.
 - An attached image or 3D file is ALREADY uploaded into the ComfyUI input folder, and its <file> block states the exact path (for example "cat.png" or "3d/car.glb"). Use that path as it is in the loader widget (LoadImage.image, Load3D.model_file) or call apply_attachment. Without a node id apply_attachment creates the matching loader node (LoadImage for an image, Load3D for a 3D file) and fills in the path; with a node id it sets that node's file widget, and it creates the loader itself when that node has no matching file widget. Never ask the user to upload the file again and never look for it with list_assets under another name.
 - An image belongs in a LoadImage node and a 3D model in a Load3D node. Call apply_attachment with just the file name when the user wants an attached file on the canvas, and do not put an image path into the model_file slot of a 3D loader.
 - A 3D model that the user attached or wants to see belongs in a Load3D node: create it with build_graph or apply_attachment and set "model_file" to the exact path, so the model renders on the canvas.
@@ -233,6 +301,14 @@ def build_system(cfg, ctx):
         parts.append(f"Run permission mode: {perm} ('ask' = the user approves each run, 'auto' = runs go through without asking).")
     if not cfg.get("vision", True):
         parts.append("Vision is disabled: you cannot see images, rely on node/graph data and file names.")
+    if cfg.get("bridge", "mcp") == "mcp" and MCP_INSTRUCTIONS:
+        parts.append(
+            "\n--- COMFYUI MCP BRIDGE INSTRUCTIONS ---\n"
+            "You are controlling ComfyUI through the official ComfyUI Model Context Protocol (comfy-mcp) bridge.\n"
+            "Use the ComfyUI MCP tools (server_info, nodes, run_workflow, generate_image, job, download, validate_workflow, etc.) "
+            "to inspect, manage, and execute workflows on ComfyUI.\n\n"
+            + MCP_INSTRUCTIONS
+        )
     if cfg.get("extra_prompt"):
         parts.append("Additional instructions from the user:\n" + cfg["extra_prompt"])
     if cfg.get("plan_mode"):
@@ -315,6 +391,25 @@ def is_gemini(base):
     return "generativelanguage.googleapis.com" in (base or "")
 
 
+def thought_signature(obj):
+    if not isinstance(obj, dict):
+        return ""
+    extra = obj.get("extra_content")
+    if isinstance(extra, dict):
+        google = extra.get("google")
+        if isinstance(google, dict) and google.get("thought_signature"):
+            return str(google["thought_signature"])
+        if extra.get("thought_signature"):
+            return str(extra["thought_signature"])
+    for key in ("thought_signature", "thoughtSignature"):
+        if obj.get(key):
+            return str(obj[key])
+    fn = obj.get("function")
+    if isinstance(fn, dict):
+        return thought_signature(fn)
+    return ""
+
+
 def gemini_schema(node):
     if isinstance(node, list):
         return [gemini_schema(x) for x in node]
@@ -338,25 +433,74 @@ def gemini_params(params):
 AUDIO_FORMATS = {"mpeg": "mp3", "mp3": "mp3", "x-wav": "wav", "wav": "wav", "wave": "wav", "x-m4a": "m4a", "mp4a": "m4a", "ogg": "ogg", "opus": "ogg", "flac": "flac", "aac": "aac", "aiff": "aiff"}
 
 
-def media_part(part, vision, gemini):
+def is_llamacpp(cfg_or_provider, base_url=""):
+    if isinstance(cfg_or_provider, dict):
+        prov = str(cfg_or_provider.get("provider") or "").lower()
+        base = str(cfg_or_provider.get("base_url") or "").lower()
+    else:
+        prov = str(cfg_or_provider or "").lower()
+        base = str(base_url or "").lower()
+    if prov == "llamacpp":
+        return True
+    return "127.0.0.1:8080" in base or "localhost:8080" in base
+
+
+VIDEO_MODEL_RE = re.compile(
+    r"(?:video|omni|qwen2(?:\.5)?-vl|minicpm-v|internvl|llava-(?:next-)?video|llava-onevision|onevision|phi-[34].*multimodal|gemma-3|[-_]vl\b|vision)",
+    re.IGNORECASE,
+)
+
+AUDIO_MODEL_RE = re.compile(
+    r"(?:audio|omni|speech|voice|whisper|qwen2(?:\.5)?-audio|ultravox|salmonn|slam|gemma-3.*audio|chameleon)",
+    re.IGNORECASE,
+)
+
+
+def llamacpp_supports_video(model_name):
+    if not model_name:
+        return True
+    return bool(VIDEO_MODEL_RE.search(str(model_name)))
+
+
+def llamacpp_supports_audio(model_name):
+    if not model_name:
+        return True
+    return bool(AUDIO_MODEL_RE.search(str(model_name)))
+
+
+def media_part(part, vision, gemini, llamacpp=False, model="", supports_audio=None, supports_video=None):
     kind = part.get("type")
     url = part.get("data_url") or ""
     mime, b64 = split_data_url(url)
+    name = part.get("name") or kind or "media"
     if kind == "image":
         return {"type": "image_url", "image_url": {"url": url}} if (vision and b64) else {"type": "text", "text": "[image omitted]"}
     if kind == "audio":
         if not b64:
             return {"type": "text", "text": "[audio omitted]"}
+        if llamacpp:
+            can_audio = llamacpp_supports_audio(model) if supports_audio is None else bool(supports_audio)
+            if not can_audio:
+                return {"type": "text", "text": f"[audio attached, but model '{model or 'current'}' does not support audio: {name}]"}
         sub = (mime or "").split(";")[0].split("/")[-1].lower()
         return {"type": "input_audio", "input_audio": {"data": b64, "format": AUDIO_FORMATS.get(sub, sub or "wav")}}
     if kind == "video":
-        if gemini and b64:
+        if not b64:
+            return {"type": "text", "text": "[video omitted]"}
+        if gemini:
             return {"type": "video_url", "video_url": {"url": url}}
-        return {"type": "text", "text": "[video attached, but this provider cannot read video: " + (part.get("name") or "video") + "]"}
+        if llamacpp:
+            if not vision:
+                return {"type": "text", "text": f"[video omitted (vision is off): {name}]"}
+            can_video = llamacpp_supports_video(model) if supports_video is None else bool(supports_video)
+            if not can_video:
+                return {"type": "text", "text": f"[video attached, but model '{model or 'current'}' does not support video: {name}]"}
+            return {"type": "video_url", "video_url": {"url": url}}
+        return {"type": "text", "text": "[video attached, but this provider cannot read video: " + name + "]"}
     return None
 
 
-def to_openai(system, messages, vision, named_tools=False, gemini=False):
+def to_openai(system, messages, vision, named_tools=False, gemini=False, llamacpp=False, model="", supports_audio=None, supports_video=None):
     out = [{"role": "system", "content": system}]
     names = {tc.get("id"): tc.get("name") for m in messages if m.get("role") == "assistant" for tc in m.get("tool_calls") or [] if tc.get("name")}
     for m in messages:
@@ -372,15 +516,31 @@ def to_openai(system, messages, vision, named_tools=False, gemini=False):
             if txt:
                 msg["content"] = txt
             if m.get("tool_calls"):
-                msg["tool_calls"] = [
-                    {
+                calls = []
+                for i, tc in enumerate(m.get("tool_calls") or []):
+                    fn = tc.get("function") or {}
+                    name = tc.get("name") or fn.get("name") or ""
+                    if not name:
+                        continue
+                    raw_args = tc.get("arguments")
+                    if raw_args is None:
+                        raw_args = fn.get("arguments")
+                    if isinstance(raw_args, str):
+                        args = safe_args(raw_args)
+                    elif isinstance(raw_args, dict):
+                        args = raw_args
+                    else:
+                        args = {}
+                    call = {
                         "id": tc.get("id") or f"call_{i}",
                         "type": "function",
-                        "function": {"name": tc.get("name") or "", "arguments": json.dumps(tc.get("arguments") or {}, ensure_ascii=False)},
+                        "function": {"name": name, "arguments": json.dumps(args, ensure_ascii=False)},
                     }
-                    for i, tc in enumerate(m.get("tool_calls") or [])
-                    if tc.get("name")
-                ]
+                    sig = tc.get("thought_signature") or thought_signature(tc)
+                    if gemini and sig:
+                        call["extra_content"] = {"google": {"thought_signature": sig}}
+                    calls.append(call)
+                msg["tool_calls"] = calls
             elif not txt:
                 msg["content"] = ""
             out.append(msg)
@@ -394,7 +554,7 @@ def to_openai(system, messages, vision, named_tools=False, gemini=False):
                 if p.get("type") == "text":
                     parts.append({"type": "text", "text": p.get("text", "")})
                 else:
-                    mapped = media_part(p, vision, gemini)
+                    mapped = media_part(p, vision, gemini, llamacpp=llamacpp, model=model, supports_audio=supports_audio, supports_video=supports_video)
                     if mapped:
                         parts.append(mapped)
             out.append({"role": "user", "content": parts or ""})
@@ -454,6 +614,13 @@ def retry_delay(attempt):
     return min(8.0, 0.8 * (2 ** attempt)) + random.uniform(0, 0.4)
 
 
+def llm_error_text(message):
+    text = str(message)
+    if "thought_signature" in text and "Function call is missing" in text:
+        return text + " | The provider dropped the Gemini thought signature for a tool call, so the call cannot be replayed. Try a model that returns it or another provider."
+    return text
+
+
 async def http_json(method, url, headers, payload=None, retries=0):
     timeout = aiohttp.ClientTimeout(total=600, sock_read=300)
     last = None
@@ -463,7 +630,7 @@ async def http_json(method, url, headers, payload=None, retries=0):
                 async with s.request(method, url, headers=headers, json=payload) as r:
                     text = await r.text()
                     if r.status >= 400:
-                        error = LLMError(f"{r.status}: {text[:600]}")
+                        error = LLMError(llm_error_text(f"{r.status}: {text[:600]}"))
                         if r.status in RETRY_STATUSES and attempt < retries:
                             last = error
                             await asyncio.sleep(retry_delay(attempt))
@@ -542,7 +709,20 @@ def text_tool_calls(content, names):
 def openai_payload(cfg, system, messages, tools):
     base = cfg["base_url"].rstrip("/")
     gemini = is_gemini(base)
-    payload = {"model": cfg["model"], "messages": to_openai(system, messages, cfg.get("vision", True), named_tools=gemini, gemini=gemini)}
+    llamacpp = is_llamacpp(cfg)
+    model = cfg.get("model", "")
+    payload = {
+        "model": model,
+        "messages": to_openai(
+            system,
+            messages,
+            cfg.get("vision", True),
+            named_tools=gemini,
+            gemini=gemini,
+            llamacpp=llamacpp,
+            model=model,
+        ),
+    }
     if tools:
         specs = []
         for t in tools:
@@ -569,6 +749,25 @@ def openai_headers(cfg):
     return headers
 
 
+def openai_calls(msg):
+    raw = msg.get("tool_calls") or []
+    msg_sig = thought_signature(msg)
+    calls = []
+    for i, tc in enumerate(raw):
+        fn = tc.get("function") or {}
+        name = fn.get("name") or ""
+        if not name:
+            continue
+        call = {"id": tc.get("id") or f"call_{i}", "name": name, "arguments": safe_args(fn.get("arguments"))}
+        sig = thought_signature(tc)
+        if not sig and len(raw) == 1:
+            sig = msg_sig
+        if sig:
+            call["thought_signature"] = sig
+        calls.append(call)
+    return calls
+
+
 async def call_openai(cfg, system, messages, tools, retries=0):
     base = cfg["base_url"].rstrip("/")
     payload = openai_payload(cfg, system, messages, tools)
@@ -585,10 +784,7 @@ async def call_openai(cfg, system, messages, tools, retries=0):
     if thoughts:
         content = re.sub(r"<think>.*?</think>", "", content, flags=re.S).strip()
         reasoning = (reasoning + "\n\n" + "\n\n".join(x.strip() for x in thoughts)).strip()
-    calls = [
-        {"id": tc.get("id") or f"call_{i}", "name": tc["function"]["name"], "arguments": safe_args(tc["function"].get("arguments"))}
-        for i, tc in enumerate(msg.get("tool_calls") or [])
-    ]
+    calls = openai_calls(msg)
     if not calls and tools:
         calls, content = text_tool_calls(content, {t["name"] for t in tools})
     return {"content": content, "reasoning": reasoning.strip(), "tool_calls": calls, "usage": norm_usage(data.get("usage"))}
@@ -691,10 +887,12 @@ async def stream_openai(cfg, system, messages, tools):
                     if ask_usage and r.status == 400 and "stream_options" in text.lower():
                         ask_usage = False
                         continue
-                    raise LLMError(f"{r.status}: {text[:600]}")
+                    raise LLMError(llm_error_text(f"{r.status}: {text[:600]}"))
                 parts, reasoning_parts = [], []
                 calls = {}
+                next_index = 0
                 usage = None
+                msg_sig = ""
                 async for raw in iter_sse(r.content):
                     if raw.strip() == "[DONE]":
                         break
@@ -711,6 +909,8 @@ async def stream_openai(cfg, system, messages, tools):
                     if not choices:
                         continue
                     delta = choices[0].get("delta") or {}
+                    if not msg_sig:
+                        msg_sig = thought_signature(delta)
                     text = delta.get("content")
                     if isinstance(text, str) and text:
                         parts.append(text)
@@ -720,14 +920,21 @@ async def stream_openai(cfg, system, messages, tools):
                         reasoning_parts.append(reason)
                         yield {"type": "reasoning", "text": reason}
                     for tc in delta.get("tool_calls") or []:
+                        fn = tc.get("function") or {}
+                        raw_index = tc.get("index")
                         try:
-                            index = int(tc.get("index") or 0)
+                            index = int(raw_index) if raw_index is not None else None
                         except (TypeError, ValueError):
-                            index = 0
+                            index = None
+                        if index is None:
+                            if fn.get("name"):
+                                index = next_index
+                                next_index += 1
+                            else:
+                                index = max(calls.keys(), default=0)
                         call = calls.setdefault(index, {"id": "", "name": "", "args": ""})
                         if tc.get("id"):
                             call["id"] = tc["id"]
-                        fn = tc.get("function") or {}
                         name = fn.get("name") or ""
                         if name and not call["name"]:
                             call["name"] = name
@@ -735,16 +942,19 @@ async def stream_openai(cfg, system, messages, tools):
                         args = fn.get("arguments")
                         if isinstance(args, str):
                             call["args"] += args
+                        sig = thought_signature(tc)
+                        if sig:
+                            call["sig"] = sig
                 content, reasoning = split_reasoning("".join(parts), "".join(reasoning_parts))
-                result_calls = [
-                    {
-                        "id": c["id"] or f"call_{i}",
-                        "name": c["name"],
-                        "arguments": safe_args(c["args"]),
-                    }
-                    for i, c in sorted(calls.items())
-                    if c["name"]
-                ]
+                result_calls = []
+                for i, c in sorted(calls.items()):
+                    if not c["name"]:
+                        continue
+                    call = {"id": c["id"] or f"call_{i}", "name": c["name"], "arguments": safe_args(c["args"])}
+                    sig = c.get("sig") or (msg_sig if len(calls) == 1 else "")
+                    if sig:
+                        call["thought_signature"] = sig
+                    result_calls.append(call)
                 if not result_calls and tools:
                     result_calls, content = text_tool_calls(content, {t["name"] for t in tools})
                 yield {"type": "done", "content": content, "reasoning": reasoning, "tool_calls": result_calls, "usage": usage}
@@ -885,6 +1095,19 @@ async def provider_context(cfg):
                 break
     except (LLMError, aiohttp.ClientError, asyncio.TimeoutError):
         pass
+    if not out.get("limit") and is_llamacpp(cfg):
+        try:
+            props = await http_json("GET", root + "/props", {})
+            n_ctx = (props.get("default_generation_settings") or {}).get("n_ctx")
+            if n_ctx:
+                out = {
+                    "key": key,
+                    "limit": int(n_ctx),
+                    "max": int(n_ctx),
+                    "source": "llamacpp",
+                }
+        except (LLMError, aiohttp.ClientError, asyncio.TimeoutError):
+            pass
     CONTEXT_CACHE["at"] = now
     CONTEXT_CACHE["data"] = out
     return out
@@ -1921,13 +2144,13 @@ def setup_routes():
         except Exception:
             return err("Bad JSON")
         cfg = load_config()
-        for key in ("provider", "base_url", "model", "extra_prompt", "agent_name", "user_name"):
+        for key in ("provider", "base_url", "model", "extra_prompt", "agent_name", "user_name", "bridge"):
             if key in body:
                 if key in ("agent_name", "user_name"):
                     cfg[key] = persona_name(body[key])
                 else:
                     cfg[key] = str(body[key] or "").strip() if key != "extra_prompt" else str(body[key] or "")
-        if cfg["provider"] not in ("openai", "anthropic"):
+        if cfg["provider"] not in ("openai", "anthropic", "llamacpp"):
             cfg["provider"] = "openai"
         if body.get("api_key"):
             cfg["api_key"] = str(body["api_key"]).strip()
@@ -1974,6 +2197,8 @@ def setup_routes():
             cfg["search_key"] = str(body["search_key"]).strip()
         if body.get("clear_search_key"):
             cfg["search_key"] = ""
+        if "onboarded" in body:
+            cfg["onboarded"] = bool(body["onboarded"])
         save_config(cfg)
         return web.json_response(public_config(cfg))
 
@@ -2029,6 +2254,81 @@ def setup_routes():
             return err(str(e), 500)
         return web.json_response({"lines": lines, "count": len(lines)})
 
+    @routes.get("/crazy_agent/mcp/status")
+    async def mcp_status(request):
+        tools = await get_mcp_tools()
+        return web.json_response({
+            "available": MCP_AVAILABLE,
+            "bridge": "comfy-mcp",
+            "tools_count": len(tools),
+            "version": getattr(comfy_mcp_server, "__version__", "0.10.0") if MCP_AVAILABLE else None,
+        })
+
+    @routes.get("/crazy_agent/mcp/tools")
+    async def mcp_tools(request):
+        tools = await get_mcp_tools()
+        return web.json_response({"tools": tools})
+
+    @routes.post("/crazy_agent/mcp/call")
+    async def mcp_call(request):
+        try:
+            body = await request.json()
+        except Exception:
+            return err("Bad JSON")
+        name = str(body.get("name") or "").strip()
+        args = body.get("arguments") or {}
+        if not name:
+            return err("Missing tool name")
+        try:
+            res = await call_mcp_tool(name, args)
+            return web.json_response(res)
+        except Exception as e:
+            return web.json_response({"ok": False, "result": f"Error: {e}", "images": [], "is_error": True})
+
+    @routes.post("/crazy_agent/mcp/install")
+    async def mcp_install(request):
+        global MCP_AVAILABLE, comfy_mcp_server, comfy_mcp_instructions, MCP_INSTRUCTIONS
+        try:
+            if MCP_AVAILABLE and comfy_mcp_server is not None:
+                tools = await get_mcp_tools()
+                return web.json_response({
+                    "ok": True,
+                    "already_installed": True,
+                    "tools_count": len(tools),
+                    "version": getattr(comfy_mcp_server, "__version__", "0.10.0"),
+                    "message": "ComfyUI MCP is already installed and ready."
+                })
+            py_bin = sys.executable or "python"
+            def run_pip():
+                return subprocess.run(
+                    [py_bin, "-m", "pip", "install", "comfy-mcp"],
+                    capture_output=True, text=True, timeout=180,
+                    encoding="utf-8", errors="replace"
+                )
+            p = await asyncio.to_thread(run_pip)
+            if p.returncode != 0:
+                return web.json_response({
+                    "ok": False,
+                    "error": f"pip install failed (code {p.returncode}):\n{p.stderr or p.stdout}"
+                }, status=500)
+            import importlib
+            comfy_mcp_server = importlib.import_module("comfy_mcp.server")
+            comfy_mcp_instructions = importlib.import_module("comfy_mcp.instructions")
+            MCP_AVAILABLE = True
+            MCP_INSTRUCTIONS = getattr(comfy_mcp_instructions, "INSTRUCTIONS", "")
+            _MCP_TOOLS_CACHE["at"] = 0
+            _MCP_TOOLS_CACHE["tools"] = []
+            tools = await get_mcp_tools()
+            return web.json_response({
+                "ok": True,
+                "already_installed": False,
+                "tools_count": len(tools),
+                "version": getattr(comfy_mcp_server, "__version__", "0.10.0"),
+                "message": "ComfyUI MCP successfully installed!"
+            })
+        except Exception as e:
+            return web.json_response({"ok": False, "error": str(e)}, status=500)
+
     @routes.post("/crazy_agent/chat")
     async def chat(request):
         try:
@@ -2042,6 +2342,13 @@ def setup_routes():
             return err("API key is not set. Open the settings (gear) in the Agent panel.")
         messages = repair(body.get("messages") or [])
         tools = body.get("tools") or []
+        if cfg.get("bridge", "mcp") == "mcp":
+            m_tools = await get_mcp_tools()
+            if m_tools:
+                existing = {t["name"] for t in tools}
+                for mt in m_tools:
+                    if mt["name"] not in existing:
+                        tools.append(mt)
         system = build_system(cfg, body.get("context") or {})
         limit = await context_limit(cfg)
         messages, over = fit_context(messages, tools, system, limit, CONTEXT_RESERVE)
@@ -2070,6 +2377,13 @@ def setup_routes():
             return err(problem)
         messages = repair(body.get("messages") or [])
         tools = body.get("tools") or []
+        if cfg.get("bridge", "mcp") == "mcp":
+            m_tools = await get_mcp_tools()
+            if m_tools:
+                existing = {t["name"] for t in tools}
+                for mt in m_tools:
+                    if mt["name"] not in existing:
+                        tools.append(mt)
         system = build_system(cfg, body.get("context") or {})
         limit = await context_limit(cfg)
         messages, over = fit_context(messages, tools, system, limit, CONTEXT_RESERVE)

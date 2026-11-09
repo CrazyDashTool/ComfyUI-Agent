@@ -102,6 +102,48 @@ class ProviderHelpers(unittest.TestCase):
         audio = {"type": "audio", "data_url": "data:audio/mpeg;base64,AAAA"}
         self.assertEqual(ag.media_part(audio, True, False)["input_audio"]["format"], "mp3")
 
+    def test_llamacpp_detection_and_multimodal(self):
+        self.assertTrue(ag.is_llamacpp({"provider": "llamacpp"}))
+        self.assertTrue(ag.is_llamacpp({"provider": "openai", "base_url": "http://127.0.0.1:8080/v1"}))
+        self.assertFalse(ag.is_llamacpp({"provider": "openai", "base_url": "https://api.openai.com/v1"}))
+
+        # Model modality support
+        self.assertTrue(ag.llamacpp_supports_video("Qwen2.5-VL-7B-Instruct.gguf"))
+        self.assertTrue(ag.llamacpp_supports_video("MiniCPM-V-2_6-Q4_K_M.gguf"))
+        self.assertTrue(ag.llamacpp_supports_video("gemma-3-4b-it"))
+        self.assertFalse(ag.llamacpp_supports_video("Llama-3.1-8B-Instruct.gguf"))
+
+        self.assertTrue(ag.llamacpp_supports_audio("Qwen2-Audio-7B.gguf"))
+        self.assertTrue(ag.llamacpp_supports_audio("whisper-large-v3.gguf"))
+        self.assertTrue(ag.llamacpp_supports_audio("mini-omni.gguf"))
+        self.assertFalse(ag.llamacpp_supports_audio("Llama-3.1-8B-Instruct.gguf"))
+
+        # media_part with llamacpp provider
+        video = {"type": "video", "data_url": "data:video/mp4;base64,AAAA", "name": "clip.mp4"}
+        audio = {"type": "audio", "data_url": "data:audio/wav;base64,AAAA", "name": "voice.wav"}
+
+        # Multimodal video model accepts video
+        v_ok = ag.media_part(video, True, False, llamacpp=True, model="Qwen2.5-VL-7B")
+        self.assertEqual(v_ok["type"], "video_url")
+
+        # Non-video model rejects video with explanation
+        v_no = ag.media_part(video, True, False, llamacpp=True, model="Llama-3-8B")
+        self.assertEqual(v_no["type"], "text")
+        self.assertIn("does not support video", v_no["text"])
+
+        # Multimodal audio model accepts audio
+        a_ok = ag.media_part(audio, True, False, llamacpp=True, model="Qwen2-Audio-7B")
+        self.assertEqual(a_ok["type"], "input_audio")
+
+        # Non-audio model rejects audio with explanation
+        a_no = ag.media_part(audio, True, False, llamacpp=True, model="Llama-3-8B")
+        self.assertEqual(a_no["type"], "text")
+        self.assertIn("does not support audio", a_no["text"])
+
+        # Vision disabled skips video
+        v_off = ag.media_part(video, False, False, llamacpp=True, model="Qwen2.5-VL-7B")
+        self.assertIn("vision is off", v_off["text"])
+
     def test_gemini_schema_replaces_empty_object(self):
         schema = ag.gemini_params({"properties": {"free": {"type": "object", "description": "d"}}})
         self.assertEqual(schema["properties"]["free"]["type"], "string")
@@ -128,6 +170,140 @@ class ProviderHelpers(unittest.TestCase):
     def test_retry_delay_is_bounded(self):
         self.assertGreaterEqual(ag.retry_delay(0), 0)
         self.assertLessEqual(ag.retry_delay(10), 8.5)
+
+
+class ThoughtSignatureHelpers(unittest.TestCase):
+    def test_signature_is_read_from_the_google_extra_content(self):
+        tc = {"id": "a", "function": {"name": "find_nodes", "arguments": "{}"},
+              "extra_content": {"google": {"thought_signature": "CvcQAdHtim/pKv/c=="}}}
+        self.assertEqual(ag.thought_signature(tc), "CvcQAdHtim/pKv/c==")
+        self.assertEqual(ag.thought_signature({"thought_signature": "x"}), "x")
+        self.assertEqual(ag.thought_signature({"function": {"thought_signature": "y"}}), "y")
+        self.assertEqual(ag.thought_signature({"id": "a"}), "")
+
+    def test_openai_calls_keep_the_signature(self):
+        msg = {"tool_calls": [
+            {"id": "a", "function": {"name": "find_nodes", "arguments": '{"q": "3d"}'}},
+        ], "extra_content": {"google": {"thought_signature": "sig-1"}}}
+        calls = ag.openai_calls(msg)
+        self.assertEqual(calls[0]["name"], "find_nodes")
+        self.assertEqual(calls[0]["arguments"], {"q": "3d"})
+        self.assertEqual(calls[0]["thought_signature"], "sig-1")
+
+    def test_gemini_replay_carries_the_signature_back(self):
+        messages = [
+            {"role": "assistant", "tool_calls": [
+                {"id": "a", "name": "find_nodes", "arguments": {"q": "3d"}, "thought_signature": "sig-1"},
+            ]},
+            {"role": "tool", "tool_call_id": "a", "content": "ok"},
+        ]
+        out = ag.to_openai("sys", messages, vision=False, named_tools=True, gemini=True)
+        call = out[1]["tool_calls"][0]
+        self.assertEqual(call["extra_content"]["google"]["thought_signature"], "sig-1")
+        other = ag.to_openai("sys", messages, vision=False, named_tools=True, gemini=False)
+        self.assertNotIn("extra_content", other[1]["tool_calls"][0])
+
+    def test_missing_signature_error_is_explained(self):
+        raw = "400: Function call is missing a thought_signature in functionCall parts."
+        self.assertIn("dropped the Gemini thought signature", ag.llm_error_text(raw))
+        self.assertEqual(ag.llm_error_text("500: boom"), "500: boom")
+
+    def test_raw_gemini_tool_call_shape_is_accepted(self):
+        messages = [{"role": "assistant", "tool_calls": [{
+            "id": "a", "type": "function",
+            "function": {"name": "find_nodes", "arguments": "{\"q\": \"3d\"}"},
+            "extra_content": {"google": {"thought_signature": "sig-2"}},
+        }]}]
+        out = ag.to_openai("sys", messages, vision=False, named_tools=True, gemini=True)
+        call = out[1]["tool_calls"][0]
+        self.assertEqual(call["function"]["name"], "find_nodes")
+        self.assertEqual(json.loads(call["function"]["arguments"]), {"q": "3d"})
+        self.assertEqual(call["extra_content"]["google"]["thought_signature"], "sig-2")
+
+
+class GeminiStreamTests(unittest.TestCase):
+    body = ""
+
+    @classmethod
+    def setUpClass(cls):
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_POST(self):
+                self.rfile.read(int(self.headers.get("Content-Length") or 0))
+                data = GeminiStreamTests.body.encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/event-stream")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+
+            def log_message(self, *args):
+                pass
+
+        cls.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
+        cls.thread.start()
+        cls.url = f"http://127.0.0.1:{cls.server.server_port}/v1"
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.server.shutdown()
+        cls.server.server_close()
+
+    @staticmethod
+    def sse(chunks):
+        return "".join("data: " + json.dumps(c) + "\n\n" for c in chunks) + "data: [DONE]\n\n"
+
+    def run_stream(self, chunks, tools):
+        GeminiStreamTests.body = self.sse(chunks)
+        cfg = {"base_url": self.url, "model": "gemini-3-pro", "api_key": "k"}
+
+        async def run():
+            events = []
+            async for ev in ag.stream_openai(cfg, "sys", [{"role": "user", "content": "hi"}], tools):
+                events.append(ev)
+            return events
+
+        return asyncio.run(run())
+
+    def test_stream_keeps_the_thought_signature(self):
+        chunks = [
+            {"choices": [{"delta": {"content": "Working"}}]},
+            {"choices": [{"delta": {"tool_calls": [{
+                "id": "default_api:create_roadmap",
+                "type": "function",
+                "function": {"name": "create_roadmap", "arguments": "{\"summary\":\"x\"}"},
+                "extra_content": {"google": {"thought_signature": "sig-abc"}},
+            }]}}]},
+            {"choices": [{"delta": {}}]},
+        ]
+        tools = [{"name": "create_roadmap", "description": "d", "parameters": {"type": "object", "properties": {}}}]
+        events = self.run_stream(chunks, tools)
+        done = events[-1]
+        self.assertEqual(done["type"], "done")
+        call = done["tool_calls"][0]
+        self.assertEqual(call["name"], "create_roadmap")
+        self.assertEqual(call["arguments"], {"summary": "x"})
+        self.assertEqual(call["thought_signature"], "sig-abc")
+
+    def test_parallel_calls_without_index_stay_separate(self):
+        chunks = [
+            {"choices": [{"delta": {"tool_calls": [{
+                "id": "a", "type": "function",
+                "function": {"name": "first_tool", "arguments": "{}"},
+                "extra_content": {"google": {"thought_signature": "sig-1"}},
+            }]}}]},
+            {"choices": [{"delta": {"tool_calls": [{
+                "id": "b", "type": "function",
+                "function": {"name": "second_tool", "arguments": "{}"},
+            }]}}]},
+        ]
+        tools = [{"name": "first_tool", "description": "d", "parameters": {"type": "object", "properties": {}}},
+                 {"name": "second_tool", "description": "d", "parameters": {"type": "object", "properties": {}}}]
+        events = self.run_stream(chunks, tools)
+        calls = events[-1]["tool_calls"]
+        self.assertEqual([c["name"] for c in calls], ["first_tool", "second_tool"])
+        self.assertEqual(calls[0]["thought_signature"], "sig-1")
+        self.assertNotIn("thought_signature", calls[1])
 
 
 class ValidationHelpers(unittest.TestCase):
@@ -234,6 +410,29 @@ class KnowledgeTests(unittest.TestCase):
         body = " ".join(d["text"] for d in nodes)
         for name in ["LoadImage", "KSampler", "CheckpointLoaderSimple", "SaveImage"]:
             self.assertIn(name, body)
+
+
+class ModelReadinessTests(unittest.TestCase):
+    def test_system_prompt_requires_the_model_check(self):
+        text = ag.build_system({}, {})
+        self.assertIn("check_model_setup", text)
+
+    def test_system_prompt_explains_the_batch_parameter(self):
+        text = ag.build_system({}, {})
+        self.assertIn("batch", text)
+
+    def test_prompting_guide_maps_families_to_prompt_styles(self):
+        docs = ag.knowledge_docs()
+        files = {d["file"] for d in docs}
+        self.assertIn("model-prompting.md", files)
+        body = " ".join(d["text"] for d in docs if d["file"] == "model-prompting.md")
+        for name in ["FLUX.1", "Z-Image", "Qwen-Image", "negative prompt"]:
+            self.assertIn(name, body)
+
+    def test_prompting_guide_is_searchable_by_family(self):
+        hits = ag.knowledge_search("prompting z-image turbo", 4)
+        self.assertTrue(hits)
+        self.assertTrue(any(h["source"] == "model-prompting.md" for h in hits))
 
 
 class CompatibilityTests(unittest.TestCase):

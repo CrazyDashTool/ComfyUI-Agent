@@ -15,6 +15,7 @@ An in-app AI agent for ComfyUI: a sidebar chat that sees the live canvas, builds
 - The canvas snapshot includes selected node ids and group titles, and `get_graph` returns them, so "here" and "in this group" are resolved from real context.
 - Checks the graph for unknown node types, missing required inputs, unavailable model/combo values and missing output nodes.
 - Runs the current canvas, waits for the result, shows the files and sends images back to the model when vision is on.
+- Batch generation: `generate` and `run_workflow` take a `batch` of 1-8 shots. When the workflow has a latent node, the shots run as one batch with `batch_size`; otherwise several prompts are queued with consecutive seeds. The job bar shows how many shots are done.
 - Diagnoses failed runs with the failing node, exception and likely fixes, and can read the ComfyUI server log for the real traceback.
 - Lists, reads and edits subgraphs, converts selected nodes into a subgraph, and moves the canvas view in and out of one.
 - Compares two workflows node by node and applies selected changes as one undoable edit.
@@ -22,6 +23,7 @@ An in-app AI agent for ComfyUI: a sidebar chat that sees the live canvas, builds
 - Finds the right node by partial words: `find_nodes` matches class names, display names, categories, search aliases, input names and the file names in the loader lists, so "3d", "glb", "loader" or "checkpoint" work. Native nodes rank first and every hit is marked as a full or partial match.
 - Ships a native node reference: the bundled knowledge base maps jobs to the node that does them, including the 3D loader (`Load3D`, shown as **Load 3D & Animation**) and the image loader (`LoadImage`), so the agent stops hunting for a "load glb" node. An empty search tells the model to search again with another word instead of guessing a class name.
 - Reads the graph natively: the canvas context lists every node type with all of its input slots and what is plugged into what, so the agent answers "what does this node need" and "what feeds it" from the graph itself instead of opening media files.
+- Smooth canvas feedback: nodes the agent creates fade in instead of popping up, and the nodes it creates or changes are marked with a pulsing outline in the current theme color. The node itself keeps its own colors, so nothing in your workflow is repainted.
 
 ### Safety and control
 - Every mutating tool runs as a transaction: a failed edit is rolled back automatically, and successful edits get a diff card with **Undo**.
@@ -47,7 +49,9 @@ An in-app AI agent for ComfyUI: a sidebar chat that sees the live canvas, builds
 - Workflow versions: named snapshots with `save_workflow_version`, `list_workflow_versions` and `restore_workflow_version`; a restore saves a safety version first.
 - `get_environment` reports Python, PyTorch, CUDA/cuDNN, GPUs with VRAM, disk space, ComfyUI version and key packages. `inspect_model` reads a model's safetensors header (tensors, parameters, dtypes, metadata). `list_node_packs` and `set_custom_node_enabled` manage installed packs.
 - Project memory: `remember` stores a short preference or convention; saved entries are injected into every turn and can be inspected or removed with `list_memory` / `forget_memory`.
-- `search_knowledge` queries a bundled reference about model families, samplers, workflow patterns, custom node packs, common errors and 3D pipelines.
+- `search_knowledge` queries a bundled reference about model families, samplers, workflow patterns, custom node packs, common errors, 3D pipelines and prompting.
+- `check_model_setup` looks at a model before it is used: it lists the parts of the family (diffusion model, text encoders, VAE), which of them are installed in the ComfyUI model folders, which are missing, the loader node for each part and where a missing file has to go. The agent calls it before it builds a workflow, so it reports the missing files instead of building a workflow that cannot run.
+- The bundled prompting guide tells the agent how to write a prompt for each family: one coherent paragraph for FLUX and Z-Image, explicit quoted text for Qwen-Image, a direct instruction for the editors, and no negative prompt where the sampler ignores it.
 - `download_model` downloads a public Hugging Face file into the right models folder, shows it as a gated action first, and never overwrites an existing file unless asked.
 - `install_custom_node` clones a public GitHub node pack into `custom_nodes`, validates the repository and branch, and reports whether a restart and requirements install are needed.
 - `model_lookup` searches Hugging Face, fetches the official repository card and README, and returns the repo URL, pipeline, tags, files, download counts and README excerpt. It works even when web search is off and needs no API key.
@@ -72,6 +76,7 @@ An in-app AI agent for ComfyUI: a sidebar chat that sees the live canvas, builds
 - Fast mode is the classic behavior: plan the work internally and act right away.
 - Self-update: on page load the panel checks GitHub, plays a short notification sound and shows a banner when a newer version exists. Automatic fast-forward is optional; ComfyUI is never restarted automatically.
 - Automatic canvas check after every edit: unavailable combo values and missing media files are reported back to the model immediately, so it fixes a broken Load Image instead of claiming success.
+- A negative prompt that has no place on the canvas is skipped instead of failing the run: the image is still generated, and the agent is told to drop the negative prompt or add a text node for it instead of retrying the same call.
 - Performance tracking per run (steps, tool calls, tokens, estimated cost, time, errors) and session totals in settings.
 - Chat export as Markdown or full JSON, including errors, rollbacks, plans, roadmaps and approvals.
 - Automatic chat titles, start ideas and follow-up suggestions generated by the model (can be turned off).
@@ -124,6 +129,8 @@ Any OpenAI-compatible endpoint works. Anthropic is supported through its native 
 | LM Studio (local) | OpenAI-compatible | `http://localhost:1234/v1` |
 | Custom | OpenAI-compatible | your URL |
 
+Gemini models that return a thought signature (Google AI Studio, Gemini 3) need it to be sent back with the function call, otherwise the API refuses the next request. The agent keeps the signature and replays it in the same shape the API returns it.
+
 ### Settings reference
 
 The settings panel has three tabs: **AI** (provider, model, limits, permissions and search), **Customization** (language, theme, names and skills) and **Logs** (chat export, server log, performance, extension updates and the compatibility report). Language, theme, names and AI fields are saved with the **Save** button on their tab. The selected tab is marked by a pill that slides over, and the panel content moves in from the side you came from.
@@ -144,7 +151,7 @@ The settings panel has three tabs: **AI** (provider, model, limits, permissions 
 | Max steps per reply | 30 | 1–200 tool/model steps before the agent stops. |
 | Stream the answer | on | SSE token streaming with automatic fallback. |
 | Confirm destructive actions | on | Asks even in `Auto` mode before deleting nodes, clearing the canvas or replacing it. |
-| Highlight changes | on | Outlines created, removed and changed nodes on the canvas. |
+| Highlight changes | on | Outlines created and changed nodes on the canvas with a pulsing ring in the theme color. |
 | Check GitHub on start | on | Compares the folder with GitHub when the page loads; a newer version triggers a banner and a notification sound. |
 | Update automatically | off | Fast-forwards a clean `main` checkout without asking. Off keeps the update waiting behind the banner and the **Update** button. |
 | Check now / Update manually | buttons | Run a forced check or apply the update immediately. |
@@ -246,16 +253,16 @@ The agent chooses tools through the model's tool-calling interface. Availability
 
 | Tool | Purpose |
 |---|---|
-| `generate` | Set the prompt and optional parameters, run the canvas and return the result. |
+| `generate` | Set the prompt and optional parameters, run the canvas and return the result. `batch` (1-8) makes several shots at once. |
 | `set_prompt` | Change positive/negative prompt text without node ids. |
 | `set_param` | Change a widget value by name on one or all nodes. |
-| `create_workflow` | Build a ready workflow from one of the four templates. |
+| `create_workflow` | Build a ready workflow from one of the four templates. `batch` (1-8) sets the `batch_size` of the latent node. |
 
 ### Generation
 
 | Tool | Purpose |
 |---|---|
-| `run_workflow` | Queue the current canvas and wait for the result or execution error. |
+| `run_workflow` | Queue the current canvas and wait for the result or execution error. `batch` (1-8) queues several shots with different seeds. |
 | `get_queue` | Read running and pending prompts from the ComfyUI queue. |
 | `cancel_execution` | Stop the current run or remove a pending prompt (asks first). |
 | `list_generations` | List recent generations with files and prompt text. |
@@ -295,6 +302,7 @@ The agent chooses tools through the model's tool-calling interface. Availability
 |---|---|
 | `list_models` | List model folders and files on disk. |
 | `model_lookup` | Search Hugging Face and read the official repository card and README. |
+| `check_model_setup` | Check what a model is made of, which parts are installed, which are missing, the loader nodes and the prompt style of the family. |
 | `system_info` | GPU, VRAM and ComfyUI/PyTorch versions. |
 | `get_environment` | Python, PyTorch, CUDA/cuDNN, GPUs, disk, ComfyUI version and package versions. |
 | `inspect_model` | Model file details, including safetensors tensors, parameters, dtypes and metadata. |
